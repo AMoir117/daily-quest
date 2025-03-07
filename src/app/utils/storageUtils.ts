@@ -1,6 +1,5 @@
 import { Task, User, DailyStats, TaskHistory, DayOfWeek } from '../types';
-import { v4 as uuidv4 } from 'uuid';
-import { XP_REWARDS, calculateLevel, calculateXpToNextLevel, LEVEL_THRESHOLDS } from './levelUtils';
+import { XP_REWARDS } from './levelUtils';
 
 // Storage keys
 const TASKS_KEY = 'dailyquest_tasks';

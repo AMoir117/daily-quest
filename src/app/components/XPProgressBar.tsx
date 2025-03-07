@@ -7,8 +7,7 @@ import {
   calculateLevel, 
   calculateXpToNextLevel, 
   calculateCurrentLevelXp, 
-  calculateCurrentLevelTotalXp,
-  LEVEL_THRESHOLDS
+  calculateCurrentLevelTotalXp
 } from '../utils/levelUtils';
 
 export default function XPProgressBar() {

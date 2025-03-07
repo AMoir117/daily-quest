@@ -34,7 +34,7 @@ export default function LevelUpModal() {
             
             <div className="mb-6 font-mono">
               <p className="text-gray-300">
-                Congratulations, brave human! You've gained enough experience to reach the next level.
+                Congratulations, brave human! You&apos;ve gained enough experience to reach the next level.
               </p>
               <p className="mt-2 text-gray-300">
                 New challenges await you and old ones get easier!

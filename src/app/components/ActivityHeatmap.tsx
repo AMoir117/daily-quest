@@ -8,9 +8,10 @@ import { format, parseISO, isAfter, isBefore, addDays, startOfYear, endOfYear } 
 import { getStats } from '../utils/storageUtils';
 import { useQuest } from '../context/QuestContext';
 import { DailyStats } from '../types';
+import { ReactCalendarHeatmapValue } from 'react-calendar-heatmap';
 
 // Define the data structure for the heatmap
-interface HeatmapValue {
+interface HeatmapValue extends ReactCalendarHeatmapValue<string> {
   date: string;
   count: number;
 }
@@ -67,8 +68,8 @@ export default function ActivityHeatmap() {
   }, [user.tasksCompleted]);
   
   // Function to determine the color intensity based on the count
-  const getClassForValue = (value: any) => {
-    if (!value || value.count === 0) {
+  const getClassForValue = (value: ReactCalendarHeatmapValue<string> | undefined) => {
+    if (!value || !('count' in value) || value.count === 0) {
       return 'color-empty';
     }
     
@@ -78,9 +79,9 @@ export default function ActivityHeatmap() {
   };
   
   // Handle tooltip display
-  const handleMouseOver = (event: React.MouseEvent, value: any) => {
-    if (value && value.count > 0) {
-      const date = format(parseISO(value.date), 'MMM d, yyyy');
+  const handleMouseOver = (event: React.MouseEvent<SVGRectElement>, value: ReactCalendarHeatmapValue<string> | undefined) => {
+    if (value && 'count' in value && value.count > 0) {
+      const date = format(parseISO(value.date as string), 'MMM d, yyyy');
       const quests = value.count === 1 ? 'quest' : 'quests';
       setTooltipContent(`${date}: ${value.count} ${quests} completed`);
       setTooltipPosition({ x: event.clientX, y: event.clientY });
@@ -106,9 +107,9 @@ export default function ActivityHeatmap() {
           showWeekdayLabels={true}
           onMouseOver={handleMouseOver}
           onMouseLeave={handleMouseLeave}
-          titleForValue={(value: any) => {
-            if (!value || value.count === 0) return 'No quests completed';
-            const date = format(parseISO(value.date), 'MMM d, yyyy');
+          titleForValue={(value: ReactCalendarHeatmapValue<string> | undefined) => {
+            if (!value || !('count' in value) || value.count === 0) return 'No quests completed';
+            const date = format(parseISO(value.date as string), 'MMM d, yyyy');
             const quests = value.count === 1 ? 'quest' : 'quests';
             return `${date}: ${value.count} ${quests} completed`;
           }}

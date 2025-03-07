@@ -306,7 +306,9 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       saveTasks(updatedTasks);
       saveUser(updatedUser);
       updateTaskHistory(updatedTask);
-      updateDailyStats(1, task.xpReward);
+      // Calculate XP difference and update stats
+      const xpGained = task.xpReward;
+      updateDailyStats(1, xpGained);
     } catch (error) {
       console.error('Error saving task completion data:', error);
     }

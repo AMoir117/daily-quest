@@ -39,8 +39,8 @@ const LevelingAlgorithms = {
       { level: 1, xpRequired: 0 } // Level 1 starts at 0 XP
     ];
     
-    let baseXp = 50; // Base XP for level 1 to 2
-    let increment = 25; // Additional XP per level
+    const baseXp = 50; // Base XP for level 1 to 2
+    const increment = 25; // Additional XP per level
     let totalXp = 0;
     
     for (let i = 1; i < 100; i++) {
@@ -62,7 +62,7 @@ const LevelingAlgorithms = {
       { level: 1, xpRequired: 0 } // Level 1 starts at 0 XP
     ];
     
-    let baseXp = 50; // Base XP for level 1 to 2
+    const baseXp = 50; // Base XP for level 1 to 2
     let totalXp = 0;
     
     for (let i = 1; i < 100; i++) {
