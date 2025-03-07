@@ -16,8 +16,6 @@ import {
 import { 
   XP_REWARDS, 
   calculateLevel,
-  calculateCurrentLevelXp,
-  calculateCurrentLevelTotalXp
 } from '../utils/levelUtils';
 
 interface QuestContextType {
@@ -306,9 +304,7 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       saveTasks(updatedTasks);
       saveUser(updatedUser);
       updateTaskHistory(updatedTask);
-      // Calculate XP difference and update stats
-      const xpGained = task.xpReward;
-      updateDailyStats(1, xpGained);
+      updateDailyStats(1, task.xpReward);
     } catch (error) {
       console.error('Error saving task completion data:', error);
     }
@@ -434,9 +430,6 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     
     // If the task was completed, update the user's XP
     if (wasCompleted) {
-      // Calculate XP difference
-      const xpDifference = newXpReward - oldXpReward;
-      
       // Calculate new total XP
       const completedTasks = updatedTasks.filter(task => task.completed);
       const calculatedTotalXp = completedTasks.reduce((total, task) => total + task.xpReward, 0);

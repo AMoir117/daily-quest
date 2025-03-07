@@ -1,5 +1,4 @@
 import { Task, User, DailyStats, TaskHistory, DayOfWeek } from '../types';
-import { XP_REWARDS } from './levelUtils';
 
 // Storage keys
 const TASKS_KEY = 'dailyquest_tasks';
