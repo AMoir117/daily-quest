@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Task, User, TaskDifficulty, DayOfWeek } from '../types';
 import { 
@@ -48,6 +48,90 @@ export function QuestProvider({ children }: { children: ReactNode }) {
   
   // Use refs to store level values for the level-up modal
   const levelUpDataRef = React.useRef({ oldLevel: 1, newLevel: 1 });
+
+  // Generate tasks from recurring tasks
+  const generateRecurringTasks = useCallback((today: string) => {
+    // Get the day of the week
+    const currentDate = new Date(today);
+    const dayOfWeek = getDayOfWeek(currentDate);
+    
+    // Find recurring tasks that should be generated today
+    const recurringTasks = tasks.filter(task => 
+      task.isRecurring && 
+      task.recurringDays && 
+      task.recurringDays.includes(dayOfWeek) &&
+      (!task.completedAt || !task.completedAt.startsWith(today))
+    );
+    
+    if (recurringTasks.length === 0) {
+      // No recurring tasks to generate, just update the lastRecurringCheck
+      const updatedUser = {
+        ...user,
+        lastRecurringCheck: today
+      };
+      
+      setUser(updatedUser);
+      saveUser(updatedUser);
+      return;
+    }
+    
+    // Generate new tasks from recurring tasks
+    const newTasks = recurringTasks.map(task => {
+      // Check if this recurring task already has an instance for today
+      const existingInstance = tasks.find(t => 
+        t.parentTaskId === task.id && 
+        t.createdAt && 
+        t.createdAt.startsWith(today)
+      );
+      
+      // If there's already an instance for today, skip creating a new one
+      if (existingInstance) return null;
+      
+      // Create a new instance of the recurring task
+      return {
+        id: uuidv4(),
+        title: task.title,
+        description: task.description,
+        difficulty: task.difficulty,
+        xpReward: task.xpReward,
+        completed: false,
+        createdAt: new Date().toISOString(),
+        completedAt: undefined,
+        isRecurring: false, // The instance is not recurring
+        parentTaskId: task.id // Reference to the recurring task
+      };
+    }).filter(Boolean) as Task[]; // Remove null values
+    
+    if (newTasks.length === 0) {
+      // No new tasks were created, just update the lastRecurringCheck
+      const updatedUser = {
+        ...user,
+        lastRecurringCheck: today
+      };
+      
+      setUser(updatedUser);
+      saveUser(updatedUser);
+      return;
+    }
+    
+    // Add the new tasks to the task list
+    const updatedTasks = [...tasks, ...newTasks];
+    
+    // Update state
+    setTasks(updatedTasks);
+    
+    // Update user with lastRecurringCheck
+    const updatedUser = {
+      ...user,
+      lastRecurringCheck: today
+    };
+    
+    setUser(updatedUser);
+    
+    // Save to localStorage
+    saveTasks(updatedTasks);
+    saveUser(updatedUser);
+  }, [tasks, user]);
 
   // Load data from localStorage on initial render
   useEffect(() => {
@@ -139,91 +223,7 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       // If we haven't checked for recurring tasks today
       generateRecurringTasks(today);
     }
-  }, [user.lastActive]);
-
-  // Generate tasks from recurring tasks
-  const generateRecurringTasks = (today: string) => {
-    // Get the day of the week
-    const currentDate = new Date(today);
-    const dayOfWeek = getDayOfWeek(currentDate);
-    
-    // Find recurring tasks that should be generated today
-    const recurringTasks = tasks.filter(task => 
-      task.isRecurring && 
-      task.recurringDays && 
-      task.recurringDays.includes(dayOfWeek) &&
-      (!task.completedAt || !task.completedAt.startsWith(today))
-    );
-    
-    if (recurringTasks.length === 0) {
-      // No recurring tasks to generate, just update the lastRecurringCheck
-      const updatedUser = {
-        ...user,
-        lastRecurringCheck: today
-      };
-      
-      setUser(updatedUser);
-      saveUser(updatedUser);
-      return;
-    }
-    
-    // Generate new tasks from recurring tasks
-    const newTasks = recurringTasks.map(task => {
-      // Check if this recurring task already has an instance for today
-      const existingInstance = tasks.find(t => 
-        t.parentTaskId === task.id && 
-        t.createdAt && 
-        t.createdAt.startsWith(today)
-      );
-      
-      // If there's already an instance for today, skip creating a new one
-      if (existingInstance) return null;
-      
-      // Create a new instance of the recurring task
-      return {
-        id: uuidv4(),
-        title: task.title,
-        description: task.description,
-        difficulty: task.difficulty,
-        xpReward: task.xpReward,
-        completed: false,
-        createdAt: new Date().toISOString(),
-        completedAt: undefined,
-        isRecurring: false, // The instance is not recurring
-        parentTaskId: task.id // Reference to the recurring task
-      };
-    }).filter(Boolean) as Task[]; // Remove null values
-    
-    if (newTasks.length === 0) {
-      // No new tasks were created, just update the lastRecurringCheck
-      const updatedUser = {
-        ...user,
-        lastRecurringCheck: today
-      };
-      
-      setUser(updatedUser);
-      saveUser(updatedUser);
-      return;
-    }
-    
-    // Add the new tasks to the task list
-    const updatedTasks = [...tasks, ...newTasks];
-    
-    // Update state
-    setTasks(updatedTasks);
-    
-    // Update user with lastRecurringCheck
-    const updatedUser = {
-      ...user,
-      lastRecurringCheck: today
-    };
-    
-    setUser(updatedUser);
-    
-    // Save to localStorage
-    saveTasks(updatedTasks);
-    saveUser(updatedUser);
-  };
+  }, [user, generateRecurringTasks]);
 
   const addTask = (title: string, description: string, difficulty: TaskDifficulty, isRecurring = false, recurringDays?: DayOfWeek[]) => {
     const newTask: Task = {
@@ -304,7 +304,9 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       saveTasks(updatedTasks);
       saveUser(updatedUser);
       updateTaskHistory(updatedTask);
-      updateDailyStats(1, task.xpReward);
+      // Calculate XP difference and update stats
+      const xpGained = task.xpReward;
+      updateDailyStats(1, xpGained);
     } catch (error) {
       console.error('Error saving task completion data:', error);
     }
@@ -407,9 +409,6 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     
     const oldTask = tasks[taskIndex];
     const wasCompleted = oldTask.completed;
-    
-    // Calculate old XP reward
-    const oldXpReward = oldTask.xpReward;
     
     // Calculate new XP reward
     const newXpReward = XP_REWARDS[difficulty];

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import CalendarHeatmap from 'react-calendar-heatmap';
 import 'react-calendar-heatmap/dist/styles.css';
 import './heatmap.css';
@@ -24,9 +24,9 @@ export default function ActivityHeatmap() {
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   
   // Calculate date ranges - start from January 1st of current year
-  const today = new Date();
-  const startDate = startOfYear(today);
-  const endDate = endOfYear(today);
+  const today = useMemo(() => new Date(), []);
+  const startDate = useMemo(() => startOfYear(today), [today]);
+  const endDate = useMemo(() => endOfYear(today), [today]);
   
   useEffect(() => {
     // Load stats from localStorage
@@ -65,7 +65,7 @@ export default function ActivityHeatmap() {
     setMaxValue(max);
     
     // Only depend on user.tasksCompleted, not on the dates which are calculated on each render
-  }, [user.tasksCompleted]);
+  }, [user.tasksCompleted, startDate, endDate]);
   
   // Function to determine the color intensity based on the count
   const getClassForValue = (value: ReactCalendarHeatmapValue<string> | undefined) => {

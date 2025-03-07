@@ -5,8 +5,8 @@ import { motion } from 'framer-motion';
 import { useQuest } from '../context/QuestContext';
 import { 
   calculateLevel, 
-  calculateXpToNextLevel, 
-  calculateCurrentLevelXp, 
+  calculateXpToNextLevel,
+  calculateCurrentLevelXp,
   calculateCurrentLevelTotalXp
 } from '../utils/levelUtils';
 

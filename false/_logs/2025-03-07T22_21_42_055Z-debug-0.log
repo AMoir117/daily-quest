@@ -1,0 +1,24 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.9.2
+2 info using node@v22.14.0
+3 silly config load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\andym\DailyQuest\daily-quest\.npmrc
+5 silly config load:file:C:\Users\andym\.npmrc
+6 silly config load:file:C:\Users\andym\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm run lint
+8 verbose argv "run" "lint" "--cache" "false"
+9 verbose logfile logs-max:10 dir:C:\Users\andym\DailyQuest\daily-quest\false\_logs\2025-03-07T22_21_42_055Z-
+10 verbose logfile C:\Users\andym\DailyQuest\daily-quest\false\_logs\2025-03-07T22_21_42_055Z-debug-0.log
+11 silly logfile done cleaning log files
+12 http fetch GET 200 https://registry.npmjs.org/npm 253ms
+13 verbose cwd C:\Users\andym\DailyQuest\daily-quest
+14 verbose os Windows_NT 10.0.22631
+15 verbose node v22.14.0
+16 verbose npm  v10.9.2
+17 notice
+17 notice New [31mmajor[39m version of npm available! [31m10.9.2[39m -> [34m11.2.0[39m
+17 notice Changelog: [34mhttps://github.com/npm/cli/releases/tag/v11.2.0[39m
+17 notice To update run: [4mnpm install -g npm@11.2.0[24m
+17 notice  { force: true, [Symbol(proc-log.meta)]: true }
+18 verbose exit 1
+19 verbose code 1
