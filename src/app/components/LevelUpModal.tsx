@@ -5,7 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useQuest } from '../context/QuestContext';
 
 export default function LevelUpModal() {
-  const { isLevelUp, dismissLevelUp, levelUpData } = useQuest();
+  const { isLevelUp, dismissLevelUp, levelUpData, user } = useQuest();
+  
+  console.log('LevelUpModal Render:', {
+    isLevelUp,
+    levelUpData,
+    currentUserLevel: user.level
+  });
   
   return (
     <AnimatePresence>
@@ -26,10 +32,7 @@ export default function LevelUpModal() {
             <div className="mb-4 text-purple-400 font-mono text-xl">⚔️ LEVEL UP! ⚔️</div>
             
             <h2 className="text-3xl font-bold mb-6 font-mono">
-              {levelUpData.oldLevel === levelUpData.newLevel - 1 
-                ? `Level ${levelUpData.oldLevel} → Level ${levelUpData.newLevel}`
-                : `Level ${levelUpData.oldLevel} → Level ${levelUpData.newLevel} (Jumped ${levelUpData.newLevel - levelUpData.oldLevel} levels!)`
-              }
+              Level {levelUpData.oldLevel} → Level {levelUpData.newLevel}
             </h2>
             
             <div className="mb-6 font-mono">

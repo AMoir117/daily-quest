@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { QuestSuggestion, getRandomQuestSuggestions } from '../utils/questSuggestions';
 import { TaskDifficulty } from '../types';
+import { useQuest } from '../context/QuestContext';
 
 interface QuestSuggestionModalProps {
   isOpen: boolean;
@@ -18,17 +19,18 @@ export default function QuestSuggestionModal({
   onSelectQuest
 }: QuestSuggestionModalProps) {
   const [suggestions, setSuggestions] = useState<QuestSuggestion[]>([]);
+  const { tasks } = useQuest();
   
   // Get new suggestions when the modal opens
   useEffect(() => {
     if (isOpen) {
-      setSuggestions(getRandomQuestSuggestions(3));
+      setSuggestions(getRandomQuestSuggestions(3, tasks));
     }
-  }, [isOpen]);
+  }, [isOpen, tasks]);
   
   // Get new suggestions
   const refreshSuggestions = () => {
-    setSuggestions(getRandomQuestSuggestions(3));
+    setSuggestions(getRandomQuestSuggestions(3, tasks));
   };
   
   // Difficulty color mapping
@@ -90,7 +92,7 @@ export default function QuestSuggestionModal({
                   <div className="flex justify-between items-center">
                     <span
                       className={`text-xs px-2 py-1 rounded font-mono ${
-                        difficultyColors[suggestion.difficulty]
+                        difficultyColors[suggestion.difficulty as TaskDifficulty]
                       }`}
                     >
                       {suggestion.difficulty.toUpperCase()}

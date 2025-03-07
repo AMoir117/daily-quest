@@ -148,51 +148,50 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       const calculatedTotalXp = completedTasks.reduce((total, task) => total + task.xpReward, 0);
       
       // Calculate level
-      const calculatedLevel = calculateLevel(calculatedTotalXp);
+      const calculatedLevel = Math.max(1, calculateLevel(calculatedTotalXp));
+      
+      console.log('Initial Load:', {
+        calculatedTotalXp,
+        calculatedLevel,
+        loadedUserLevel: loadedUser.level
+      });
       
       // Update user with calculated values
       const updatedUser = {
         ...loadedUser,
         totalXp: calculatedTotalXp,
         level: calculatedLevel,
-        tasksCompleted: completedTasks.length
+        tasksCompleted: completedTasks.length,
+        lastActive: loadedUser.lastActive || new Date().toISOString().split('T')[0],
+        lastRecurringCheck: loadedUser.lastRecurringCheck,
+        streakDays: loadedUser.streakDays || 0
       };
       
       setUser(updatedUser);
       setPrevTotalXp(calculatedTotalXp);
-      setPrevLevel(calculatedLevel); // Set prevLevel to the current level on initial load
-      setNewLevel(calculatedLevel); // Set newLevel to the current level on initial load
+      setPrevLevel(calculatedLevel);
+      setNewLevel(calculatedLevel);
       
-      // Initialize the levelUpDataRef
+      // Initialize the levelUpDataRef with the current level
       levelUpDataRef.current = {
         oldLevel: calculatedLevel,
         newLevel: calculatedLevel
       };
       
+      console.log('After Initial Setup:', {
+        levelUpDataRef: levelUpDataRef.current,
+        prevLevel,
+        newLevel
+      });
+      
       // Save the updated user data
       saveUser(updatedUser);
     } catch (error) {
       console.error('Error loading data from localStorage:', error);
-      
-      // Initialize with default values
       setTasks([]);
       setUser(DEFAULT_USER);
     }
   }, []);
-
-  // Monitor XP changes to detect level ups
-  useEffect(() => {
-    if (prevTotalXp > 0 && user.totalXp > prevTotalXp) {
-      const oldLevel = calculateLevel(prevTotalXp);
-      const newLevel = calculateLevel(user.totalXp);
-      
-      if (newLevel > oldLevel) {
-        setIsLevelUp(true);
-      }
-      
-      setPrevTotalXp(user.totalXp);
-    }
-  }, [user.totalXp, prevTotalXp]);
 
   // Check for streak updates and generate recurring tasks
   useEffect(() => {
@@ -267,9 +266,17 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     const completedTasks = updatedTasks.filter(task => task.completed);
     const calculatedTotalXp = completedTasks.reduce((total, task) => total + task.xpReward, 0);
     
-    // Calculate new level
-    const oldLevel = calculateLevel(user.totalXp);
-    const newLevelValue = calculateLevel(calculatedTotalXp);
+    // Calculate new level using the recalculated XP values
+    const oldLevel = Math.max(1, calculateLevel(prevTotalXp));
+    const newLevelValue = Math.max(1, calculateLevel(calculatedTotalXp));
+    
+    console.log('Task Complete Calculations:', {
+      prevTotalXp,
+      calculatedTotalXp,
+      oldLevel,
+      newLevelValue,
+      currentLevelUpData: levelUpDataRef.current
+    });
     
     // Update user stats
     const updatedUser = {
@@ -282,7 +289,12 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     
     // Check for level up - handle multi-level jumps
     if (newLevelValue > oldLevel) {
-      // Store the level values in the ref
+      console.log('Level Up Detected:', {
+        from: oldLevel,
+        to: newLevelValue
+      });
+      
+      // Store the level values in the ref and state
       levelUpDataRef.current = {
         oldLevel: oldLevel,
         newLevel: newLevelValue
@@ -292,12 +304,19 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       setPrevLevel(oldLevel);
       setNewLevel(newLevelValue);
       setIsLevelUp(true);
+      
+      console.log('After Level Up Updates:', {
+        levelUpDataRef: levelUpDataRef.current,
+        prevLevel: oldLevel,
+        newLevel: newLevelValue,
+        isLevelUp: true
+      });
     }
     
     // Update state
     setTasks(updatedTasks);
     setUser(updatedUser);
-    setPrevTotalXp(user.totalXp); // Store previous XP for level change detection
+    setPrevTotalXp(calculatedTotalXp);
     
     // Save to localStorage
     try {
@@ -485,7 +504,11 @@ export function QuestProvider({ children }: { children: ReactNode }) {
   };
 
   const dismissLevelUp = () => {
-    // Only hide the level up modal without resetting any other state
+    // Update the levelUpDataRef to the current level after dismissing
+    levelUpDataRef.current = {
+      oldLevel: newLevel,
+      newLevel: newLevel
+    };
     setIsLevelUp(false);
   };
 
