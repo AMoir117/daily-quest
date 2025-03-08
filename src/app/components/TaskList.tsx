@@ -51,7 +51,6 @@ function TaskItem({ task, onEdit, onUndo, onCopy }: TaskItemProps) {
   
   // Check if this instance is for today
   const today = getLocalDateString();
-  const isToday = task.createdAt && task.createdAt.startsWith(today);
   
   // Get current day of week for daily instances
   const currentDayOfWeek = isDailyInstance ? getDayOfWeek(new Date()) : '';
@@ -199,7 +198,7 @@ export default function TaskList({
   showActive = true, 
   showCompleted = true 
 }: TaskListProps) {
-  const { tasks, undoTask, copyTask, forceRegenerateRecurringTasks, completeTask } = useQuest();
+  const { tasks, undoTask, copyTask} = useQuest();
   
   // Filter tasks based on completion status
   const activeTasks = tasks.filter(task => !task.completed);
@@ -300,14 +299,6 @@ export default function TaskList({
     };
   }, [activeTasks, completedTasks]);
   
-  // Add counter for recurring task instances to organize the UI
-  const { regularTasks, recurringTemplates, recurringInstances } = React.useMemo(() => {
-    return {
-      regularTasks: activeTasks.filter(task => !task.isRecurring && !task.parentTaskId),
-      recurringTemplates: activeTasks.filter(task => task.isRecurring),
-      recurringInstances: activeTasks.filter(task => task.parentTaskId)
-    };
-  }, [activeTasks]);
   
   if (tasks.length === 0) {
     return (
