@@ -3,7 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon, SparklesIcon } from '@heroicons/react/24/outline';
-import { QuestSuggestion, getRandomQuestSuggestions } from '../utils/questSuggestions';
+import { 
+  QuestSuggestion, 
+  getRandomQuestSuggestions, 
+  getRecurringAndUnexpectedSuggestions,
+  QuestCategory
+} from '../utils/questSuggestions';
 import { TaskDifficulty } from '../types';
 import { useQuest } from '../context/QuestContext';
 
@@ -24,13 +29,13 @@ export default function QuestSuggestionModal({
   // Get new suggestions when the modal opens
   useEffect(() => {
     if (isOpen) {
-      setSuggestions(getRandomQuestSuggestions(3, tasks));
+      setSuggestions(getRecurringAndUnexpectedSuggestions(tasks));
     }
   }, [isOpen, tasks]);
   
   // Get new suggestions
   const refreshSuggestions = () => {
-    setSuggestions(getRandomQuestSuggestions(3, tasks));
+    setSuggestions(getRecurringAndUnexpectedSuggestions(tasks));
   };
   
   // Difficulty color mapping
@@ -38,6 +43,26 @@ export default function QuestSuggestionModal({
     easy: 'text-green-500 bg-green-900/30',
     medium: 'text-yellow-500 bg-yellow-900/30',
     hard: 'text-red-500 bg-red-900/30'
+  };
+
+  // Category label mapping
+  const categoryLabels: Record<QuestCategory, { text: string, classes: string }> = {
+    recurring: { text: 'RECURRING', classes: 'bg-blue-900/50 text-blue-300' },
+    health: { text: 'HEALTH', classes: 'bg-green-900/50 text-green-300' },
+    productivity: { text: 'PRODUCTIVITY', classes: 'bg-yellow-900/50 text-yellow-300' },
+    personal: { text: 'PERSONAL', classes: 'bg-purple-900/50 text-purple-300' },
+    home: { text: 'HOME', classes: 'bg-orange-900/50 text-orange-300' },
+    tech: { text: 'TECH', classes: 'bg-indigo-900/50 text-indigo-300' },
+    social: { text: 'SOCIAL', classes: 'bg-pink-900/50 text-pink-300' }
+  };
+  
+  // Function to safely get category label
+  const getCategoryLabel = (category: QuestCategory | undefined) => {
+    if (!category || !categoryLabels[category]) {
+      // Default fallback if category is missing or invalid
+      return { text: 'TASK', classes: 'bg-gray-900/50 text-gray-300' };
+    }
+    return categoryLabels[category];
   };
   
   return (
@@ -55,10 +80,10 @@ export default function QuestSuggestionModal({
             exit={{ scale: 0.9, y: 20 }}
             className="bg-gray-800 rounded-lg p-6 max-w-md w-full border border-gray-700 shadow-xl"
           >
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-2">
               <h2 className="text-xl font-mono flex items-center">
                 <SparklesIcon className="w-5 h-5 mr-2 text-purple-400" />
-                Quest Suggestions
+                Daily Quests
               </h2>
               <button
                 onClick={onClose}
@@ -68,6 +93,10 @@ export default function QuestSuggestionModal({
               </button>
             </div>
             
+            <p className="text-sm text-gray-400 mb-4">
+              Choose from everyday recurring tasks and one random challenge to add to your quest log.
+            </p>
+            
             <div className="space-y-4 mb-6">
               {suggestions.map((suggestion, index) => (
                 <motion.div
@@ -75,7 +104,9 @@ export default function QuestSuggestionModal({
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="p-4 border border-gray-700 rounded-md bg-gray-900 cursor-pointer hover:border-purple-500 transition-colors"
+                  className={`p-4 border border-gray-700 rounded-md bg-gray-900 cursor-pointer hover:border-purple-500 transition-colors ${
+                    suggestion.category !== 'recurring' ? 'border-l-4 border-l-purple-500' : ''
+                  }`}
                   onClick={() => {
                     onSelectQuest(
                       suggestion.title,
@@ -85,7 +116,12 @@ export default function QuestSuggestionModal({
                     onClose();
                   }}
                 >
-                  <h3 className="text-lg font-mono mb-1">{suggestion.title}</h3>
+                  <h3 className="text-lg font-mono mb-1 flex items-center">
+                    {suggestion.title}
+                    <span className={`ml-2 text-xs px-2 py-1 rounded ${getCategoryLabel(suggestion.category).classes}`}>
+                      {getCategoryLabel(suggestion.category).text}
+                    </span>
+                  </h3>
                   <p className="text-sm text-gray-400 font-mono mb-2">
                     {suggestion.description}
                   </p>

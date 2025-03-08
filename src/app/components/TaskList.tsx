@@ -23,10 +23,17 @@ function TaskItem({ task, onEdit, onUndo, onCopy }: TaskItemProps) {
     tasks.find(t => t.id === task.parentTaskId) : 
     undefined;
   
+  // Define difficulty colors for text and borders
   const difficultyColors = {
     easy: 'text-green-500',
     medium: 'text-yellow-500',
     hard: 'text-red-500'
+  };
+  
+  const difficultyBorders = {
+    easy: 'border-green-500',
+    medium: 'border-yellow-500',
+    hard: 'border-red-500'
   };
   
   // Format date for display
@@ -55,33 +62,37 @@ function TaskItem({ task, onEdit, onUndo, onCopy }: TaskItemProps) {
   // Format day of week with first letter capitalized
   const formattedDayOfWeek = currentDayOfWeek.charAt(0).toUpperCase() + currentDayOfWeek.slice(1);
   
+  // Determine border color based on task type and difficulty
+  const getBorderClass = () => {
+    if (isRecurringTemplate) return 'border-blue-700 bg-gray-800/90';
+    if (isDailyInstance) return `${difficultyBorders[task.difficulty]} bg-gray-800`;
+    return `${difficultyBorders[task.difficulty]} bg-gray-800`;
+  };
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className={`p-4 mb-3 rounded-md border ${
-        isRecurringTemplate ? 'border-blue-700 bg-gray-800/90' : 
-        isDailyInstance ? 'border-purple-700 bg-gray-800' : 
-        'border-gray-700 bg-gray-800'
-      } ${
-        task.completed ? 'opacity-60' : ''
-      }`}
+      className={`p-4 mb-3 rounded-md border ${getBorderClass()}`}
     >
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <div className="flex items-center">
             {/* For recurring templates and regular tasks, show title normally */}
             {(!isDailyInstance || task.completed) && (
-              <h3 className={`text-lg font-mono ${task.completed ? 'line-through' : ''}`}>
+              <h3 className={`text-lg font-mono ${task.completed && !isDailyInstance ? 'line-through opacity-60' : ''}`}>
                 {task.title}
+                {task.completed && isDailyInstance && (
+                  <span className="ml-2 text-green-500 font-bold no-underline not-italic">COMPLETED</span>
+                )}
               </h3>
             )}
             
             {/* For daily instances that are not completed, only show the day */}
             {isDailyInstance && !task.completed && (
               <h3 className="text-lg font-mono flex items-center">
-                <span className="text-purple-400">{task.title}</span>
+                <span className={`${difficultyColors[task.difficulty]}`}>{task.title}</span>
                 <span className="ml-2 text-xs text-gray-400">
                   <ArrowPathIcon className="w-3 h-3 inline-block mr-1" />
                   {formattedDayOfWeek}
@@ -97,9 +108,11 @@ function TaskItem({ task, onEdit, onUndo, onCopy }: TaskItemProps) {
             )}
           </div>
           {task.description && (
-            <p className="text-sm text-gray-400 mt-1 font-mono">{task.description}</p>
+            <p className={`text-sm text-gray-400 mt-1 font-mono ${task.completed ? 'opacity-60' : ''}`}>
+              {task.description}
+            </p>
           )}
-          <div className="flex items-center mt-2 text-xs">
+          <div className={`flex items-center mt-2 text-xs ${task.completed ? 'opacity-60' : ''}`}>
             <span className={`${difficultyColors[task.difficulty]} mr-2 font-mono`}>
               {task.difficulty.toUpperCase()}
             </span>
@@ -546,6 +559,13 @@ function RecurringInstanceItem({ template }: { template: Task }) {
     hard: 'text-red-500'
   };
   
+  // Define difficulty border colors
+  const difficultyBorders = {
+    easy: 'border-green-500',
+    medium: 'border-yellow-500',
+    hard: 'border-red-500'
+  };
+  
   // Check if there's already a completed task for this template today
   useEffect(() => {
     // If completion is pending, don't check for undone tasks yet
@@ -649,7 +669,7 @@ function RecurringInstanceItem({ template }: { template: Task }) {
   };
   
   return (
-    <div className={`p-4 mb-3 rounded-md border border-purple-700 relative transition-all duration-300 ease-in-out ${
+    <div className={`p-4 mb-3 rounded-md border ${difficultyBorders[template.difficulty]} relative transition-all duration-300 ease-in-out ${
       isCompleted 
         ? 'bg-gray-800/30 opacity-70 filter blur-[1px] pointer-events-none' 
         : 'bg-gray-800 hover:bg-gray-700'
@@ -657,7 +677,7 @@ function RecurringInstanceItem({ template }: { template: Task }) {
       {/* Overlay "Completed" text on completed tasks - positioned with z-index to ensure visibility */}
       {isCompleted && (
         <div className="absolute inset-0 flex items-center justify-center z-10 transition-opacity duration-300 ease-in-out">
-          <span className="text-xl font-mono text-white font-bold tracking-widest bg-gray-900/80 px-4 py-2 rounded-md transform scale-100 transition-transform duration-300">
+          <span className="text-xl font-mono text-green-500 font-bold tracking-widest bg-gray-900/80 px-4 py-2 rounded-md transform scale-100 transition-transform duration-300">
             COMPLETED
           </span>
         </div>
@@ -666,7 +686,7 @@ function RecurringInstanceItem({ template }: { template: Task }) {
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <div className="flex items-center">
-            <h3 className={`text-lg font-mono text-purple-400 flex items-center ${isCompleted ? 'line-through' : ''}`}>
+            <h3 className={`text-lg font-mono ${difficultyColors[template.difficulty]} flex items-center ${isCompleted ? 'line-through' : ''}`}>
               {template.title}
               <span className="ml-2 text-xs text-gray-400">
                 <ArrowPathIcon className="w-3 h-3 inline-block mr-1" />

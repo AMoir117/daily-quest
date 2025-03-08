@@ -9,6 +9,9 @@ import LevelUpModal from './components/LevelUpModal';
 import UserStats from './components/UserStats';
 import XPChart from './components/XPChart';
 import ActivityHeatmap from './components/ActivityHeatmap';
+import TaskDifficultyChart from './components/TaskDifficultyChart';
+import CompletionTimeChart from './components/CompletionTimeChart';
+import FailedQuests from './components/UncompletedRecurringTasks';
 import QuestSuggestionModal from './components/QuestSuggestionModal';
 import ResetDataButton from './components/ResetDataButton';
 import { PlusIcon, SparklesIcon } from '@heroicons/react/24/outline';
@@ -94,6 +97,8 @@ export default function Home() {
         <div className="mb-8">
           <h2 className="text-xl font-mono mb-4 border-b border-gray-700 pb-2">Visualizations</h2>
           <XPChart />
+          <TaskDifficultyChart />
+          <CompletionTimeChart />
           <ActivityHeatmap />
         </div>
         
@@ -102,6 +107,9 @@ export default function Home() {
           <h2 className="text-xl font-mono mb-4 border-b border-gray-700 pb-2">Completed Quests</h2>
           <TaskList onEditTask={handleEditTask} showActive={false} showCompleted={true} />
         </div>
+        
+        {/* Failed quests section */}
+        <FailedQuests />
         
         {/* Reset data button */}
         <ResetDataButton />
