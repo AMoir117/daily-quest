@@ -328,8 +328,8 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       // If we haven't checked for recurring tasks today - typically on first page load
       generateRecurringTasks(today);
     }
-  // Only depend on specific user properties we need to check, not the entire user object
-  }, [user.lastActive, user.lastRecurringCheck, user.streakDays, generateRecurringTasks, tasks, updateTaskHistory]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.lastActive, user.lastRecurringCheck, user.streakDays, tasks, prevLevel, newLevel]);
 
   const addTask = (title: string, description: string, difficulty: TaskDifficulty, isRecurring = false, recurringDays?: DayOfWeek[]) => {
     const newTask: Task = {

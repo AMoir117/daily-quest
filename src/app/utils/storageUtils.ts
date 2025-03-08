@@ -243,13 +243,12 @@ export function saveHistory(history: TaskHistory[]): void {
 }
 
 // Function to update daily stats
-export function updateDailyStats(tasksCompleted: number, xpGained: number): void {
+export function updateDailyStats(tasksCompleted: number, xpGained: number, providedDate?: string): void {
   // Get today's date in local timezone
   const today = getLocalDateString();
   
   // Safety check: ensure we never add stats for tomorrow
-  if (arguments.length > 2 && typeof arguments[2] === 'string') {
-    const providedDate = arguments[2];
+  if (providedDate) {
     if (providedDate > today) {
       console.error('Attempted to add stats for a future date:', providedDate);
       return; // Don't add stats for future dates

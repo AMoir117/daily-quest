@@ -390,7 +390,7 @@ export default function TaskList({
                     No recurring quests for {(() => {
                       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                       return days[new Date().getDay()];
-                    })()}. Add some in the "Manage Recurring Templates" section.
+                    })()}. Add some in the &quot;Manage Recurring Templates&quot; section.
                   </div>
                 )}
               </div>
@@ -427,7 +427,7 @@ export default function TaskList({
                 }
                 
                 {activeTasks.filter(task => task.isRecurring).length === 0 && (
-                  <p className="text-sm text-gray-400 font-mono">No recurring templates yet. Create one by checking "Make this a recurring quest" when adding a new quest.</p>
+                  <p className="text-sm text-gray-400 font-mono">No recurring templates yet. Create one by checking &quot;Make this a recurring quest&quot; when adding a new quest.</p>
                 )}
               </div>
             </div>
