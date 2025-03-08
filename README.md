@@ -1,4 +1,4 @@
-This is a todo app gamer brainrotified, made it in a day with cursor+claude. I plan to use this daily to track my productivity.
+This is a todo app with suprisingly good productivity visualizations designed for gamer brainrot. I plan to use this daily to track my productivity.
 
 ## UI Example
 
@@ -11,5 +11,4 @@ This is a todo app gamer brainrotified, made it in a day with cursor+claude. I p
 
 ## Todo
 
-make suggestions better - make more recurring tasks - suggest 2 recurring tasks that the average person would do - like brush teeth, take trash out, car wash, etc - then suggest 1 that is like wtf i would have never thought to do this today
-more/better visualizations
+my mind is blank for now

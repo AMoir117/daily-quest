@@ -141,12 +141,68 @@ const barOptions = {
   }
 };
 
-type ChartType = 'line' | 'bar';
+// XP Velocity Chart options
+const velocityOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'top' as const,
+      labels: {
+        font: {
+          family: 'monospace'
+        }
+      }
+    },
+    title: {
+      display: true,
+      text: 'XP Velocity (7-Day Moving Average)',
+      font: {
+        family: 'monospace',
+        size: 16
+      }
+    },
+    tooltip: {
+      callbacks: {
+        label: function(context: any) {
+          return `${context.dataset.label}: ${Math.round(context.raw)} XP/day`;
+        }
+      }
+    }
+  },
+  scales: {
+    x: {
+      ticks: {
+        font: {
+          family: 'monospace'
+        }
+      }
+    },
+    y: {
+      beginAtZero: true,
+      title: {
+        display: true,
+        text: 'XP per Day',
+        font: {
+          family: 'monospace'
+        }
+      },
+      ticks: {
+        font: {
+          family: 'monospace'
+        }
+      }
+    }
+  }
+};
+
+type ChartType = 'line' | 'bar' | 'velocity';
 
 export default function XPChart() {
   const { user } = useQuest();
   const [stats, setStats] = useState<DailyStats[]>([]);
   const [chartType, setChartType] = useState<ChartType>('line');
+  const [velocityData, setVelocityData] = useState<number[]>([]);
   
   useEffect(() => {
     // Load stats from localStorage
@@ -166,7 +222,37 @@ export default function XPChart() {
     );
     
     setStats(sortedStats);
+    
+    // Calculate velocity data (7-day moving average)
+    calculateVelocityData(sortedStats);
   }, [user.tasksCompleted]); // Re-fetch stats when tasksCompleted changes
+  
+  // Calculate velocity data (7-day moving average)
+  const calculateVelocityData = (sortedStats: DailyStats[]) => {
+    const windowSize = 7; // 7-day moving average
+    const velocityPoints: number[] = [];
+    
+    // We need at least windowSize days of data to calculate a moving average
+    if (sortedStats.length < windowSize) {
+      // If we don't have enough data, just use what we have
+      const avgXP = sortedStats.reduce((sum, stat) => sum + stat.xpGained, 0) / sortedStats.length;
+      velocityPoints.push(avgXP);
+    } else {
+      // Calculate moving average for each day after the initial window
+      for (let i = windowSize - 1; i < sortedStats.length; i++) {
+        // Sum the XP gained in the window
+        let windowSum = 0;
+        for (let j = 0; j < windowSize; j++) {
+          windowSum += sortedStats[i - j].xpGained;
+        }
+        // Calculate the average
+        const avgXP = windowSum / windowSize;
+        velocityPoints.push(avgXP);
+      }
+    }
+    
+    setVelocityData(velocityPoints);
+  };
   
   // Format date for display (e.g., "Mar 15")
   const formatDate = (dateString: string) => {
@@ -217,6 +303,22 @@ export default function XPChart() {
     ]
   };
   
+  // Prepare velocity chart data
+  const velocityChartData = {
+    // Use labels starting from the 7th day (or whatever window size we're using)
+    labels: stats.slice(Math.min(7, stats.length) - 1).map(stat => formatDate(stat.date)),
+    datasets: [
+      {
+        label: 'XP Velocity',
+        data: velocityData,
+        borderColor: 'rgb(234, 88, 12)', // Orange
+        backgroundColor: 'rgba(234, 88, 12, 0.5)',
+        tension: 0.3,
+        fill: true
+      }
+    ]
+  };
+  
   if (stats.length === 0) {
     return (
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 h-64 flex items-center justify-center mb-6">
@@ -239,6 +341,14 @@ export default function XPChart() {
             XP Chart
           </button>
           <button
+            onClick={() => setChartType('velocity')}
+            className={`px-3 py-1 rounded-md font-mono text-sm ${
+              chartType === 'velocity' ? 'bg-orange-700' : 'bg-gray-700'
+            }`}
+          >
+            Velocity
+          </button>
+          <button
             onClick={() => setChartType('bar')}
             className={`px-3 py-1 rounded-md font-mono text-sm ${
               chartType === 'bar' ? 'bg-blue-700' : 'bg-gray-700'
@@ -252,10 +362,23 @@ export default function XPChart() {
       <div className="h-64">
         {chartType === 'line' ? (
           <Line options={lineOptions} data={lineData} />
+        ) : chartType === 'velocity' ? (
+          <Line options={velocityOptions} data={velocityChartData} />
         ) : (
           <Bar options={barOptions} data={barData} />
         )}
       </div>
+      
+      {chartType === 'velocity' && (
+        <div className="mt-4 text-sm text-gray-400 font-mono">
+          <p>XP Velocity shows your average daily XP gain over a 7-day period. Higher values indicate increased productivity.</p>
+          {velocityData.length > 0 && (
+            <p className="mt-2">
+              Current velocity: <span className="text-orange-400 font-bold">{Math.round(velocityData[velocityData.length - 1])} XP/day</span>
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 } 
