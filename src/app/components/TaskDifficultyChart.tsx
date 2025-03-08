@@ -8,7 +8,8 @@ import {
   BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ChartOptions
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { useQuest } from '../context/QuestContext';
@@ -144,7 +145,7 @@ export default function TaskDifficultyChart() {
   };
 
   // Chart options
-  const options = {
+  const options: ChartOptions<'bar'> = {
     indexAxis: 'y' as const, // Horizontal bar chart
     responsive: true,
     maintainAspectRatio: false,
@@ -189,12 +190,12 @@ export default function TaskDifficultyChart() {
       },
       tooltip: {
         callbacks: {
-          label: function(context: any) {
-            const label = context.dataset.label || '';
-            const value = context.raw || 0;
+          label: function(tooltipItem) {
+            const label = tooltipItem.dataset.label || '';
+            const value = tooltipItem.raw as number;
             return `${label}: ${value}`;
           },
-          footer: function(tooltipItems: any) {
+          footer: function(tooltipItems) {
             const index = tooltipItems[0].dataIndex;
             const total = chartData.totalCounts[index];
             const completed = chartData.completedCounts[index];

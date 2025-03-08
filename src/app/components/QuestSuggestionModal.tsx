@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { 
   QuestSuggestion, 
-  getRandomQuestSuggestions, 
   getRecurringAndUnexpectedSuggestions,
   QuestCategory
 } from '../utils/questSuggestions';

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Task } from '../types';
 import { getHistory, getLocalDateString } from '../utils/storageUtils';
 import { useQuest } from '../context/QuestContext';
-import { CalendarIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { CalendarIcon } from '@heroicons/react/24/outline';
 
 export default function FailedQuests() {
   const { tasks } = useQuest();

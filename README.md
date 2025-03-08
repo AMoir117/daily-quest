@@ -7,7 +7,7 @@ This is a todo app gamer brainrotified, made it in a day with cursor+claude. I p
 
 ## Deployed on Vercel
 
-[Previous Build](https://daily-quest-6n8dp8ht5-amoir117s-projects.vercel.app/)
+[Live Build](https://daily-quest-git-main-amoir117s-projects.vercel.app/)
 
 ## Todo
 

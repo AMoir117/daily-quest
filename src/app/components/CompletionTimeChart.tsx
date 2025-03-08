@@ -8,7 +8,9 @@ import {
   BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  TooltipItem,
+  ChartOptions
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { useQuest } from '../context/QuestContext';
@@ -27,7 +29,6 @@ ChartJS.register(
 export default function CompletionTimeChart() {
   const { tasks } = useQuest();
   const [hourlyData, setHourlyData] = useState<number[]>(Array(24).fill(0));
-  const [maxValue, setMaxValue] = useState(0);
   const [productiveRange, setProductiveRange] = useState<{start: number, end: number} | null>(null);
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export default function CompletionTimeChart() {
         }
       });
       
-      // Find the maximum value for scaling
+      // Find the maximum value for scaling (not used but kept for future reference)
       const max = Math.max(...hourlyDistribution);
       
       // Find the most productive 3-hour range
@@ -80,9 +81,8 @@ export default function CompletionTimeChart() {
       };
     };
 
-    const { hourlyDistribution, max, productiveRange } = getCompletionTimeDistribution(tasks);
+    const { hourlyDistribution, productiveRange } = getCompletionTimeDistribution(tasks);
     setHourlyData(hourlyDistribution);
-    setMaxValue(max);
     setProductiveRange(productiveRange);
   }, [tasks]);
 
@@ -132,7 +132,7 @@ export default function CompletionTimeChart() {
   };
 
   // Chart options
-  const options = {
+  const options: ChartOptions<'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
@@ -145,7 +145,7 @@ export default function CompletionTimeChart() {
           font: {
             family: 'monospace'
           },
-          callback: function(value: any, index: number) {
+          callback: function(value, index) {
             // Only show every 3 hours to avoid crowding
             return index % 3 === 0 ? hourLabels[index] : '';
           }
@@ -180,11 +180,11 @@ export default function CompletionTimeChart() {
       },
       tooltip: {
         callbacks: {
-          title: function(tooltipItems: any) {
+          title: function(tooltipItems) {
             return `${hourLabels[tooltipItems[0].dataIndex]}`;
           },
-          label: function(context: any) {
-            const count = context.raw;
+          label: function(tooltipItem) {
+            const count = tooltipItem.raw as number;
             const label = count === 1 ? 'task completed' : 'tasks completed';
             return `${count} ${label}`;
           }
