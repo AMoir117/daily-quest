@@ -2,7 +2,7 @@ This is a todo app gamer brainrotified, made it in a day with cursor+claude. I p
 
 ## UI Example
 
-![Daily Quest GIF](C:\Users\andym\DailyQuest\daily-quest\media\dailyquest-f.gif)
+![Daily Quest GIF](https://github.com/AMoir117/daily-quest/blob/main/media/dailyquest-f.gif?raw=true)
 
 
 ## Deployed on Vercel
