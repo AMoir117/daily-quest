@@ -164,6 +164,7 @@ const velocityOptions = {
     },
     tooltip: {
       callbacks: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         label: function(context: any) {
           return `${context.dataset.label}: ${Math.round(context.raw)} XP/day`;
         }
