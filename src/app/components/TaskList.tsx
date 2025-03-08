@@ -49,8 +49,6 @@ function TaskItem({ task, onEdit, onUndo, onCopy }: TaskItemProps) {
   const isRecurringTemplate = task.isRecurring;
   const isDailyInstance = Boolean(task.parentTaskId);
   
-  // Check if this instance is for today
-  const today = getLocalDateString();
   
   // Get current day of week for daily instances
   const currentDayOfWeek = isDailyInstance ? getDayOfWeek(new Date()) : '';
@@ -204,12 +202,6 @@ export default function TaskList({
   const activeTasks = tasks.filter(task => !task.completed);
   const completedTasks = tasks.filter(task => task.completed);
   
-  // Define difficulty colors for use in the component
-  const difficultyColors = {
-    easy: 'text-green-500',
-    medium: 'text-yellow-500',
-    hard: 'text-red-500'
-  };
   
   // Organize active tasks to avoid duplicates in the UI
   const organizedActiveTasks = React.useMemo(() => {
@@ -274,7 +266,6 @@ export default function TaskList({
       if (instance.completed) return false;
       
       // Check if created today
-      const isCreatedToday = instance.createdAt?.startsWith(today);
       const forToday = true; // We'll show all instances regardless of creation date
       
       // Keep all non-completed instances for today's templates
