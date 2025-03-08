@@ -29,6 +29,20 @@ if (typeof window !== 'undefined') {
   );
 }
 
+// Only attempt to render the chart on the client side 
+function safeChartRender(chartData: any, options: ChartOptions<'bar'>) {
+  try {
+    return <Bar options={options} data={chartData} />;
+  } catch (error) {
+    console.error('Error rendering chart:', error);
+    return (
+      <div className="text-red-500 font-mono p-4 h-full flex items-center justify-center">
+        Error rendering chart. Please try refreshing the page.
+      </div>
+    );
+  }
+}
+
 export default function CompletionTimeChart() {
   const { tasks } = useQuest();
   const [hourlyData, setHourlyData] = useState<number[]>(Array(24).fill(0));
@@ -270,15 +284,17 @@ export default function CompletionTimeChart() {
     <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
       <h2 className="text-xl font-mono mb-4">Productive Hours</h2>
       
-      <div className="h-64 mb-4">
-        {isClient && <Bar data={chartData} options={options} />}
+      <div className="h-64">
+        {safeChartRender(chartData, options)}
       </div>
-      
+
       {productiveRange && (
-        <div className="text-center">
+        <div className="text-center mt-4">
           <p className="text-sm text-gray-400 font-mono">
-            Your most productive hours are between <span className="text-purple-400 font-bold">{formatProductiveRange()}</span> 
-            <span> with </span><span className="text-purple-400 font-bold">{getProductiveRangeTasks()}</span> completed tasks.
+            Most productive time: <span className="text-purple-400 font-bold">{formatProductiveRange()}</span>
+          </p>
+          <p className="text-sm text-gray-400 font-mono">
+            Tasks completed: <span className="text-purple-400 font-bold">{getProductiveRangeTasks()}</span>
           </p>
         </div>
       )}

@@ -30,6 +30,20 @@ if (typeof window !== 'undefined') {
   );
 }
 
+// Only attempt to render the chart on the client side
+function safeChartRender(chartData: any, options: ChartOptions<'bar'>) {
+  try {
+    return <Bar options={options} data={chartData} />;
+  } catch (error) {
+    console.error('Error rendering chart:', error);
+    return (
+      <div className="text-red-500 font-mono p-4 h-full flex items-center justify-center">
+        Error rendering chart. Please try refreshing the page.
+      </div>
+    );
+  }
+}
+
 export default function TaskDifficultyChart() {
   const { tasks } = useQuest();
   const [chartData, setChartData] = useState<{
@@ -243,7 +257,7 @@ export default function TaskDifficultyChart() {
       <div className="grid grid-cols-1 gap-4">
         {/* Horizontal bar chart */}
         <div className="h-48">
-          {isClient && <Bar data={barData} options={options} />}
+          {safeChartRender(barData, options)}
         </div>
         
         {/* Completion rate stats */}

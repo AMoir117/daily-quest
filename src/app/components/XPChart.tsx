@@ -18,18 +18,23 @@ import { getStats, getLocalDateString } from '../utils/storageUtils';
 import { DailyStats } from '../types';
 import { useQuest } from '../context/QuestContext';
 
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+// Only register Chart.js on the client side
+let isChartRegistered = false;
+
+if (typeof window !== 'undefined' && !isChartRegistered) {
+  ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+  );
+  isChartRegistered = true;
+}
 
 // Chart options
 const lineOptions = {
@@ -206,6 +211,7 @@ export default function XPChart() {
   const [stats, setStats] = useState<DailyStats[]>([]);
   const [chartType, setChartType] = useState<ChartType>('line');
   const [velocityData, setVelocityData] = useState<number[]>([]);
+  const [isDataReady, setIsDataReady] = useState(false);
   
   useEffect(() => {
     // Load stats from localStorage
@@ -228,6 +234,9 @@ export default function XPChart() {
     
     // Calculate velocity data (7-day moving average)
     calculateVelocityData(sortedStats);
+    
+    // Mark data as ready after everything is processed
+    setIsDataReady(true);
   }, [user.tasksCompleted]); // Re-fetch stats when tasksCompleted changes
   
   // Calculate velocity data (7-day moving average)
@@ -322,6 +331,26 @@ export default function XPChart() {
     ]
   };
   
+  // Render chart based on type
+  const renderChart = () => {
+    if (!isDataReady || stats.length === 0) {
+      return <div className="flex items-center justify-center h-full">Loading chart data...</div>;
+    }
+
+    try {
+      if (chartType === 'line') {
+        return <Line options={lineOptions} data={lineData} />;
+      } else if (chartType === 'bar') {
+        return <Bar options={barOptions} data={barData} />;
+      } else {
+        return <Line options={velocityOptions} data={velocityChartData} />;
+      }
+    } catch (error) {
+      console.error('Error rendering chart:', error);
+      return <div className="text-red-500">Error rendering chart. Please try refreshing.</div>;
+    }
+  };
+  
   if (stats.length === 0) {
     return (
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 h-64 flex items-center justify-center mb-6">
@@ -333,43 +362,36 @@ export default function XPChart() {
   return (
     <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-mono">Charts</h2>
+        <h2 className="text-xl font-mono">XP Analytics</h2>
         <div className="flex space-x-2">
           <button
             onClick={() => setChartType('line')}
-            className={`px-3 py-1 rounded-md font-mono text-sm ${
-              chartType === 'line' ? 'bg-purple-700' : 'bg-gray-700'
+            className={`px-3 py-1 rounded font-mono text-sm ${
+              chartType === 'line' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'
             }`}
           >
-            XP Chart
+            Progress
           </button>
           <button
             onClick={() => setChartType('velocity')}
-            className={`px-3 py-1 rounded-md font-mono text-sm ${
-              chartType === 'velocity' ? 'bg-orange-700' : 'bg-gray-700'
+            className={`px-3 py-1 rounded font-mono text-sm ${
+              chartType === 'velocity' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'
             }`}
           >
             Velocity
           </button>
           <button
             onClick={() => setChartType('bar')}
-            className={`px-3 py-1 rounded-md font-mono text-sm ${
-              chartType === 'bar' ? 'bg-blue-700' : 'bg-gray-700'
+            className={`px-3 py-1 rounded font-mono text-sm ${
+              chartType === 'bar' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'
             }`}
           >
-            Quest Chart
+            Quests/Day
           </button>
         </div>
       </div>
-      
-      <div className="h-64">
-        {chartType === 'line' ? (
-          <Line options={lineOptions} data={lineData} />
-        ) : chartType === 'velocity' ? (
-          <Line options={velocityOptions} data={velocityChartData} />
-        ) : (
-          <Bar options={barOptions} data={barData} />
-        )}
+      <div className="h-80">
+        {renderChart()}
       </div>
       
       {chartType === 'velocity' && (
