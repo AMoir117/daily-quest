@@ -10,6 +10,18 @@ import {
   calculateCurrentLevelTotalXp
 } from '../utils/levelUtils';
 
+// Function to get level color based on the level - same as in UserStats
+const getLevelColor = (level: number) => {
+  if (level < 5) return { bg: 'bg-green-500', text: 'text-green-400', border: 'border-green-700' };
+  if (level < 10) return { bg: 'bg-blue-500', text: 'text-blue-400', border: 'border-blue-700' };
+  if (level < 15) return { bg: 'bg-purple-500', text: 'text-purple-400', border: 'border-purple-700' };
+  if (level < 20) return { bg: 'bg-red-500', text: 'text-red-400', border: 'border-red-700' };
+  if (level < 30) return { bg: 'bg-orange-500', text: 'text-orange-400', border: 'border-orange-700' };
+  if (level < 40) return { bg: 'bg-pink-500', text: 'text-pink-400', border: 'border-pink-700' };
+  if (level < 50) return { bg: 'bg-indigo-500', text: 'text-indigo-400', border: 'border-indigo-700' };
+  return { bg: 'bg-yellow-500', text: 'text-yellow-400', border: 'border-yellow-700' }; // 50+
+};
+
 export default function XPProgressBar() {
   const { tasks } = useQuest();
   const [animateProgress, setAnimateProgress] = useState(false);
@@ -21,7 +33,8 @@ export default function XPProgressBar() {
     currentLevelXp, 
     currentLevelTotalXp, 
     progressPercentage,
-    xpToNextLevel
+    xpToNextLevel,
+    levelColors
   } = useMemo(() => {
     // Get completed tasks
     const completedTasks = tasks.filter(task => task.completed);
@@ -40,13 +53,17 @@ export default function XPProgressBar() {
     // Calculate progress percentage
     const percentage = Math.min(100, (levelXp / levelTotalXp) * 100 || 0);
     
+    // Get level color
+    const colors = getLevelColor(calculatedLevel);
+    
     return {
       totalXp: calculatedTotalXp,
       level: calculatedLevel,
       currentLevelXp: levelXp,
       currentLevelTotalXp: levelTotalXp,
       progressPercentage: percentage,
-      xpToNextLevel: nextLevelXp
+      xpToNextLevel: nextLevelXp,
+      levelColors: colors
     };
   }, [tasks]);
   
@@ -72,9 +89,9 @@ export default function XPProgressBar() {
         </div>
       </div>
       
-      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+      <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
         <motion.div 
-          className="h-full bg-blue-500"
+          className={`h-full ${levelColors.bg}`}
           initial={{ width: 0 }}
           animate={{ width: `${progressPercentage}%` }}
           transition={{ duration: 0.5 }}
@@ -83,7 +100,7 @@ export default function XPProgressBar() {
       </div>
       
       <div className="flex justify-between items-center mt-1">
-        <div className="text-xs text-gray-500">Total XP: {totalXp}</div>
+        <div className={`text-xs ${levelColors.text}`}>Total XP: {totalXp}</div>
         <div className="text-xs text-gray-500">XP to Next Level: {xpToNextLevel}</div>
       </div>
     </div>

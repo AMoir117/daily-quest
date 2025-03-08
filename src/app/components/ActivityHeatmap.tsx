@@ -5,7 +5,7 @@ import CalendarHeatmap from 'react-calendar-heatmap';
 import 'react-calendar-heatmap/dist/styles.css';
 import './heatmap.css';
 import { format, parseISO, isAfter, isBefore, addDays, startOfYear, endOfYear } from 'date-fns';
-import { getStats } from '../utils/storageUtils';
+import { getStats, getLocalDateString } from '../utils/storageUtils';
 import { useQuest } from '../context/QuestContext';
 import { DailyStats } from '../types';
 import { ReactCalendarHeatmapValue } from 'react-calendar-heatmap';
@@ -32,22 +32,33 @@ export default function ActivityHeatmap() {
     // Load stats from localStorage
     const stats = getStats();
     
+    // Get today's date for filtering
+    const today = getLocalDateString();
+    const todayDate = parseISO(`${today}T12:00:00`);
+    
+    // Ensure endDate is not in the future
+    const safeEndDate = isAfter(endDate, todayDate) ? todayDate : endDate;
+    
     // Create a map of all dates in the range with 0 counts
     const dateMap = new Map<string, number>();
     let currentDate = new Date(startDate);
     
-    while (!isAfter(currentDate, endDate)) {
+    while (!isAfter(currentDate, safeEndDate)) {
       const dateStr = format(currentDate, 'yyyy-MM-dd');
       dateMap.set(dateStr, 0);
       currentDate = addDays(currentDate, 1);
     }
     
-    // Update with actual stats
+    // Update with actual stats, filtering out future dates
     stats.forEach((stat: DailyStats) => {
       const dateStr = stat.date;
+      
+      // Skip future dates
+      if (dateStr > today) return;
+      
       const date = parseISO(dateStr);
       
-      if (isAfter(date, startDate) && isBefore(date, addDays(endDate, 1))) {
+      if (isAfter(date, startDate) && isBefore(date, addDays(safeEndDate, 1))) {
         dateMap.set(dateStr, stat.tasksCompleted);
       }
     });
@@ -81,7 +92,9 @@ export default function ActivityHeatmap() {
   // Handle tooltip display
   const handleMouseOver = (event: React.MouseEvent<SVGRectElement>, value: ReactCalendarHeatmapValue<string> | undefined) => {
     if (value && 'count' in value && value.count > 0) {
-      const date = format(parseISO(value.date as string), 'MMM d, yyyy');
+      // Add time component to ensure consistent date parsing across browsers
+      const dateStr = typeof value.date === 'string' ? `${value.date}T12:00:00` : '';
+      const date = dateStr ? format(new Date(dateStr), 'MMM d, yyyy') : '';
       const quests = value.count === 1 ? 'quest' : 'quests';
       setTooltipContent(`${date}: ${value.count} ${quests} completed`);
       setTooltipPosition({ x: event.clientX, y: event.clientY });
@@ -109,7 +122,9 @@ export default function ActivityHeatmap() {
           onMouseLeave={handleMouseLeave}
           titleForValue={(value: ReactCalendarHeatmapValue<string> | undefined) => {
             if (!value || !('count' in value) || value.count === 0) return 'No quests completed';
-            const date = format(parseISO(value.date as string), 'MMM d, yyyy');
+            // Add time component to ensure consistent date parsing across browsers
+            const dateStr = typeof value.date === 'string' ? `${value.date}T12:00:00` : '';
+            const date = dateStr ? format(new Date(dateStr), 'MMM d, yyyy') : '';
             const quests = value.count === 1 ? 'quest' : 'quests';
             return `${date}: ${value.count} ${quests} completed`;
           }}

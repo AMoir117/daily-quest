@@ -6,6 +6,12 @@ const USER_KEY = 'dailyquest_user';
 const STATS_KEY = 'dailyquest_stats';
 const HISTORY_KEY = 'dailyquest_history';
 
+// Helper function to get today's date in YYYY-MM-DD format based on local timezone
+export function getLocalDateString(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
 // Default user data
 export const DEFAULT_USER: User = {
   level: 1,
@@ -14,7 +20,7 @@ export const DEFAULT_USER: User = {
   xpToNextLevel: 100,
   tasksCompleted: 0,
   streakDays: 0,
-  lastActive: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
+  lastActive: getLocalDateString(), // Today's date in local timezone format
   lastRecurringCheck: undefined
 };
 
@@ -114,7 +120,54 @@ export function getTasks(): Task[] {
 }
 
 export function saveTasks(tasks: Task[]): void {
-  saveToStorage(TASKS_KEY, tasks);
+  try {
+    // Validate tasks array
+    if (!Array.isArray(tasks)) {
+      console.error('Invalid tasks data (not an array):', tasks);
+      return;
+    }
+    
+    // Make sure we don't have any null or undefined tasks
+    const validTasks = tasks.filter(task => task && task.id);
+    
+    // Check if we filtered anything out
+    if (validTasks.length !== tasks.length) {
+      console.warn(`Filtered out ${tasks.length - validTasks.length} invalid tasks during save`);
+    }
+    
+    // Ensure no duplicate task IDs
+    const uniqueTasks = removeDuplicateTasks(validTasks);
+    
+    if (uniqueTasks.length !== validTasks.length) {
+      console.warn(`Removed ${validTasks.length - uniqueTasks.length} duplicate task IDs`);
+    }
+    
+    // Save the validated tasks array
+    saveToStorage(TASKS_KEY, uniqueTasks);
+    
+    // Verify the save was successful
+    const savedTasks = getTasks();
+    if (savedTasks.length !== uniqueTasks.length) {
+      console.warn(`Task save verification failed. Expected ${uniqueTasks.length} tasks, got ${savedTasks.length}`);
+    }
+  } catch (error) {
+    console.error('Error in saveTasks:', error);
+  }
+}
+
+// Helper function to remove tasks with duplicate IDs (keeping the latest version)
+function removeDuplicateTasks(tasks: Task[]): Task[] {
+  const taskMap = new Map<string, Task>();
+  
+  // Process tasks in reverse to keep the latest version of each task ID
+  [...tasks].reverse().forEach(task => {
+    if (task && task.id) {
+      taskMap.set(task.id, task);
+    }
+  });
+  
+  // Convert map back to array and reverse again to restore original order
+  return Array.from(taskMap.values()).reverse();
 }
 
 // User-specific functions
@@ -191,24 +244,41 @@ export function saveHistory(history: TaskHistory[]): void {
 
 // Function to update daily stats
 export function updateDailyStats(tasksCompleted: number, xpGained: number): void {
-  const today = new Date().toISOString().split('T')[0];
+  // Get today's date in local timezone
+  const today = getLocalDateString();
+  
+  // Safety check: ensure we never add stats for tomorrow
+  if (arguments.length > 2 && typeof arguments[2] === 'string') {
+    const providedDate = arguments[2];
+    if (providedDate > today) {
+      console.error('Attempted to add stats for a future date:', providedDate);
+      return; // Don't add stats for future dates
+    }
+  }
+  
   const stats = getStats();
   
-  const todayStats = stats.find(stat => stat.date === today);
+  // Filter out any future dates that might be in the stats already
+  const validStats = stats.filter(stat => stat.date <= today);
+  
+  // Find today's stats
+  const todayStats = validStats.find(stat => stat.date === today);
   
   if (todayStats) {
     todayStats.tasksCompleted += tasksCompleted;
     todayStats.xpGained += xpGained;
-    saveStats(stats);
+    saveStats(validStats);
   } else {
-    const newStats = [...stats, { date: today, tasksCompleted, xpGained }];
+    const newStats = [...validStats, { date: today, tasksCompleted, xpGained }];
     saveStats(newStats);
   }
 }
 
 // Function to update task history
 export function updateTaskHistory(task: Task): void {
-  const today = new Date().toISOString().split('T')[0];
+  // Get today's date in local timezone
+  const today = getLocalDateString();
+  
   const history = getHistory();
   
   const todayHistory = history.find(h => h.date === today);
@@ -297,5 +367,109 @@ export function resetUserData(): void {
     saveUser({ ...DEFAULT_USER });
   } catch (error) {
     console.error('Error resetting user data:', error);
+  }
+}
+
+// Function to clean up any future dates in the stats
+export function cleanupFutureDates(): void {
+  if (!isBrowser) return;
+  
+  try {
+    // Get today's date
+    const today = getLocalDateString();
+    
+    // Clean up stats
+    const stats = getStats();
+    const validStats = stats.filter(stat => stat.date <= today);
+    
+    if (validStats.length !== stats.length) {
+      console.log(`Removed ${stats.length - validStats.length} future date entries from stats.`);
+      saveStats(validStats);
+    }
+    
+    // Clean up history
+    const history = getHistory();
+    const validHistory = history.filter(h => h.date <= today);
+    
+    if (validHistory.length !== history.length) {
+      console.log(`Removed ${history.length - validHistory.length} future date entries from history.`);
+      saveHistory(validHistory);
+    }
+  } catch (error) {
+    console.error('Error cleaning up future dates:', error);
+  }
+}
+
+// Function to clean up duplicate recurring tasks
+export function cleanupDuplicateTasks(): void {
+  if (!isBrowser) return;
+  
+  try {
+    // Get all tasks
+    const tasks = getTasks();
+    
+    // Find all recurring templates
+    const recurringTemplates = tasks.filter(task => task.isRecurring);
+    
+    // Group by title
+    const templatesByTitle: Record<string, Task[]> = {};
+    recurringTemplates.forEach(template => {
+      if (!templatesByTitle[template.title]) {
+        templatesByTitle[template.title] = [];
+      }
+      templatesByTitle[template.title].push(template);
+    });
+    
+    // Find duplicate templates (more than one template with the same title)
+    const duplicateTitles = Object.keys(templatesByTitle).filter(
+      title => templatesByTitle[title].length > 1
+    );
+    
+    if (duplicateTitles.length === 0) {
+      // No duplicates found
+      return;
+    }
+    
+    // For each duplicate title, keep only the first template and update all instances
+    // to reference the kept template
+    const keptTemplates: Record<string, Task> = {};
+    const tasksToRemove: string[] = [];
+    
+    // Identify which templates to keep and which to remove
+    duplicateTitles.forEach(title => {
+      const templates = templatesByTitle[title];
+      // Keep the first template
+      keptTemplates[title] = templates[0];
+      // Mark the rest for removal
+      templates.slice(1).forEach(template => {
+        tasksToRemove.push(template.id);
+      });
+    });
+    
+    // Update all instances of the removed templates to reference the kept template
+    const updatedTasks = tasks.map(task => {
+      if (task.parentTaskId && tasksToRemove.includes(task.parentTaskId)) {
+        // Find which template this should reference now
+        const duplicateTemplate = recurringTemplates.find(t => t.id === task.parentTaskId);
+        if (duplicateTemplate && keptTemplates[duplicateTemplate.title]) {
+          return {
+            ...task,
+            parentTaskId: keptTemplates[duplicateTemplate.title].id
+          };
+        }
+      }
+      return task;
+    });
+    
+    // Remove the duplicate templates
+    const filteredTasks = updatedTasks.filter(task => !tasksToRemove.includes(task.id));
+    
+    // Save the cleaned up tasks
+    if (filteredTasks.length !== tasks.length) {
+      console.log(`Removed ${tasks.length - filteredTasks.length} duplicate recurring tasks.`);
+      saveTasks(filteredTasks);
+    }
+  } catch (error) {
+    console.error('Error cleaning up duplicate tasks:', error);
   }
 } 

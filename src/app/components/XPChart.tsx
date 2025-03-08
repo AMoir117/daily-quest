@@ -13,7 +13,7 @@ import {
   BarElement
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
-import { getStats } from '../utils/storageUtils';
+import { getStats, getLocalDateString } from '../utils/storageUtils';
 import { DailyStats } from '../types';
 import { useQuest } from '../context/QuestContext';
 
@@ -44,7 +44,7 @@ const lineOptions = {
     },
     title: {
       display: true,
-      text: 'XP Gained Over Time',
+      text: 'XP Progress Over Time',
       font: {
         family: 'monospace',
         size: 16
@@ -60,7 +60,38 @@ const lineOptions = {
       }
     },
     y: {
+      type: 'linear' as const,
+      display: true,
+      position: 'left' as const,
       beginAtZero: true,
+      title: {
+        display: true,
+        text: 'Cumulative XP',
+        font: {
+          family: 'monospace'
+        }
+      },
+      ticks: {
+        font: {
+          family: 'monospace'
+        }
+      }
+    },
+    y1: {
+      type: 'linear' as const,
+      display: true,
+      position: 'right' as const,
+      beginAtZero: true,
+      grid: {
+        drawOnChartArea: false,
+      },
+      title: {
+        display: true,
+        text: 'Daily XP',
+        font: {
+          family: 'monospace'
+        }
+      },
       ticks: {
         font: {
           family: 'monospace'
@@ -121,8 +152,16 @@ export default function XPChart() {
     // Load stats from localStorage
     const loadedStats = getStats();
     
+    // Get today's date for filtering
+    const today = getLocalDateString();
+    
+    // Filter out any future dates (should not exist, but somehow they do)
+    const validStats = loadedStats.filter(stat => {
+      return stat.date <= today;
+    });
+    
     // Sort by date
-    const sortedStats = [...loadedStats].sort((a, b) => 
+    const sortedStats = [...validStats].sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
     
@@ -131,7 +170,10 @@ export default function XPChart() {
   
   // Format date for display (e.g., "Mar 15")
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    // Handle date strings in YYYY-MM-DD format to prevent timezone issues
+    // By appending 'T12:00:00' we set it to noon to avoid any date shifting
+    const fullDateString = `${dateString}T12:00:00`;
+    const date = new Date(fullDateString);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
   
@@ -140,11 +182,26 @@ export default function XPChart() {
     labels: stats.map(stat => formatDate(stat.date)),
     datasets: [
       {
-        label: 'XP Gained',
-        data: stats.map(stat => stat.xpGained),
+        label: 'Cumulative XP',
+        data: stats.reduce((acc: number[], stat, index) => {
+          // Calculate cumulative sum
+          const previousTotal = index > 0 ? acc[index - 1] : 0;
+          acc.push(previousTotal + stat.xpGained);
+          return acc;
+        }, []),
         borderColor: 'rgb(147, 51, 234)',
         backgroundColor: 'rgba(147, 51, 234, 0.5)',
-        tension: 0.3
+        tension: 0.3,
+        yAxisID: 'y'
+      },
+      {
+        label: 'Daily XP',
+        data: stats.map(stat => stat.xpGained),
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+        tension: 0.3,
+        yAxisID: 'y1',
+        borderDash: [5, 5]
       }
     ]
   };
