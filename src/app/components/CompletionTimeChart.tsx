@@ -9,7 +9,6 @@ import {
   Title,
   Tooltip,
   Legend,
-  TooltipItem,
   ChartOptions
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
