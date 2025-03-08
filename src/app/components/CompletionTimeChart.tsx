@@ -16,21 +16,31 @@ import { useQuest } from '../context/QuestContext';
 import { Task } from '../types';
 
 // Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-);
+if (typeof window !== 'undefined') {
+  ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend
+  );
+}
 
 export default function CompletionTimeChart() {
   const { tasks } = useQuest();
   const [hourlyData, setHourlyData] = useState<number[]>(Array(24).fill(0));
   const [productiveRange, setProductiveRange] = useState<{start: number, end: number} | null>(null);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    // Skip if SSR (server-side rendering)
+    if (typeof window === 'undefined') return;
+    
     // Process task data to extract completion times
     const getCompletionTimeDistribution = (tasks: Task[]) => {
       // Initialize an array with 24 zeros (one for each hour)
@@ -39,9 +49,15 @@ export default function CompletionTimeChart() {
       // Count completions by hour
       tasks.forEach(task => {
         if (task.completed && task.completedAt) {
-          const completionDate = new Date(task.completedAt);
-          const hour = completionDate.getHours();
-          hourlyDistribution[hour]++;
+          try {
+            const completionDate = new Date(task.completedAt);
+            const hour = completionDate.getHours();
+            if (!isNaN(hour) && hour >= 0 && hour < 24) {
+              hourlyDistribution[hour]++;
+            }
+          } catch (error) {
+            console.error('Error parsing date:', error);
+          }
         }
       });
       
@@ -193,6 +209,14 @@ export default function CompletionTimeChart() {
   };
 
   // If there are no completed tasks, show a message
+  if (!isClient) {
+    return (
+      <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 h-40 flex items-center justify-center mb-6">
+        <p className="text-gray-400 font-mono">Loading productive hours...</p>
+      </div>
+    );
+  }
+  
   if (tasks.filter(task => task.completed).length === 0) {
     return (
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 h-40 flex items-center justify-center mb-6">
@@ -245,7 +269,7 @@ export default function CompletionTimeChart() {
       <h2 className="text-xl font-mono mb-4">Productive Hours</h2>
       
       <div className="h-64 mb-4">
-        <Bar data={chartData} options={options} />
+        {isClient && <Bar data={chartData} options={options} />}
       </div>
       
       {productiveRange && (

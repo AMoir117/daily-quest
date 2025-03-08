@@ -17,14 +17,16 @@ import { Task, TaskDifficulty } from '../types';
 import { getHistory } from '../utils/storageUtils';
 
 // Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-);
+if (typeof window !== 'undefined') {
+  ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend
+  );
+}
 
 export default function TaskDifficultyChart() {
   const { tasks } = useQuest();
@@ -37,8 +39,16 @@ export default function TaskDifficultyChart() {
     totalCounts: [0, 0, 0],
     completionRates: [0, 0, 0],
   });
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    // Skip if SSR (server-side rendering)
+    if (typeof window === 'undefined') return;
+    
     // Process task data to get difficulty distribution
     const getTaskDifficultyDistribution = (tasks: Task[]) => {
       // Get task history to track uncompleted recurring tasks
@@ -208,6 +218,14 @@ export default function TaskDifficultyChart() {
   };
 
   // If there are no tasks (excluding recurring templates), show a message
+  if (!isClient) {
+    return (
+      <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 h-40 flex items-center justify-center mb-6">
+        <p className="text-gray-400 font-mono">Loading difficulty distribution...</p>
+      </div>
+    );
+  }
+  
   if (tasks.filter(task => !task.isRecurring || task.parentTaskId).length === 0) {
     return (
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 h-40 flex items-center justify-center mb-6">
@@ -223,7 +241,7 @@ export default function TaskDifficultyChart() {
       <div className="grid grid-cols-1 gap-4">
         {/* Horizontal bar chart */}
         <div className="h-48">
-          <Bar data={barData} options={options} />
+          {isClient && <Bar data={barData} options={options} />}
         </div>
         
         {/* Completion rate stats */}
