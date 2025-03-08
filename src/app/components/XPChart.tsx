@@ -40,6 +40,16 @@ if (typeof window !== 'undefined' && !isChartRegistered) {
 const lineOptions = {
   responsive: true,
   maintainAspectRatio: false,
+  elements: {
+    line: {
+      tension: 0, // Disables bezier curves, uses straight lines
+      borderWidth: 2
+    },
+    point: {
+      radius: 4,
+      hitRadius: 10
+    }
+  },
   plugins: {
     legend: {
       position: 'top' as const,
@@ -289,7 +299,8 @@ export default function XPChart() {
         }, []),
         borderColor: 'rgb(147, 51, 234)',
         backgroundColor: 'rgba(147, 51, 234, 0.5)',
-        tension: 0.3,
+        tension: 0, // Use straight lines instead of curves
+        stepped: false, // Ensure no stepped interpolation
         yAxisID: 'y'
       },
       {
@@ -297,7 +308,8 @@ export default function XPChart() {
         data: stats.map(stat => stat.xpGained),
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.5)',
-        tension: 0.3,
+        tension: 0, // Use straight lines instead of curves
+        stepped: false, // Ensure no stepped interpolation
         yAxisID: 'y1',
         borderDash: [5, 5]
       }
@@ -325,7 +337,8 @@ export default function XPChart() {
         data: velocityData,
         borderColor: 'rgb(234, 88, 12)', // Orange
         backgroundColor: 'rgba(234, 88, 12, 0.5)',
-        tension: 0.3,
+        tension: 0, // Use straight lines instead of curves
+        stepped: false, // Ensure no stepped interpolation
         fill: true
       }
     ]

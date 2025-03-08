@@ -6,10 +6,10 @@ import TaskList from './components/TaskList';
 import TaskForm from './components/TaskForm';
 import LevelUpModal from './components/LevelUpModal';
 import UserStats from './components/UserStats';
-import DynamicXPChart from './components/charts/DynamicXPChart';
+import StaticXPChart from './components/StaticXPChart';
 import ActivityHeatmap from './components/ActivityHeatmap';
-import DynamicTaskDifficultyChart from './components/charts/DynamicTaskDifficultyChart';
-import DynamicCompletionTimeChart from './components/charts/DynamicCompletionTimeChart';
+import StaticTaskDifficultyChart from './components/StaticTaskDifficultyChart';
+import StaticCompletionTimeChart from './components/StaticCompletionTimeChart';
 import FailedQuests from './components/UncompletedRecurringTasks';
 import QuestSuggestionModal from './components/QuestSuggestionModal';
 import ResetDataButton from './components/ResetDataButton';
@@ -91,9 +91,9 @@ export default function Home() {
         {/* Visualizations section */}
         <div className="mb-8">
           <h2 className="text-xl font-mono mb-4 border-b border-gray-700 pb-2">Visualizations</h2>
-          <DynamicXPChart />
-          <DynamicTaskDifficultyChart />
-          <DynamicCompletionTimeChart />
+          <StaticXPChart />
+          <StaticTaskDifficultyChart />
+          <StaticCompletionTimeChart />
           <ActivityHeatmap />
         </div>
         
