@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { Task, TaskDifficulty } from './types';
-import XPProgressBar from './components/XPProgressBar';
 import TaskList from './components/TaskList';
 import TaskForm from './components/TaskForm';
 import LevelUpModal from './components/LevelUpModal';
@@ -55,10 +54,6 @@ export default function Home() {
       </header>
       
       <main className="container mx-auto p-4 max-w-4xl">
-        <div className="mb-6">
-          <XPProgressBar />
-        </div>
-        
         <div className="mb-8">
           <UserStats />
         </div>

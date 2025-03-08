@@ -19,7 +19,8 @@ import {
 import { 
   XP_REWARDS, 
   calculateLevel,
-  LEVEL_THRESHOLDS
+  LEVEL_THRESHOLDS,
+  calculateXpToNextLevel
 } from '../utils/levelUtils';
 
 interface QuestContextType {
@@ -42,6 +43,27 @@ interface QuestContextType {
 }
 
 const QuestContext = createContext<QuestContextType | undefined>(undefined);
+
+// Define streak milestones and rewards
+const STREAK_MILESTONES = [
+  { days: 3, xpReward: 50, name: "3-Day Streak" },
+  { days: 7, xpReward: 100, name: "Weekly Warrior" },
+  { days: 14, xpReward: 250, name: "Fortnight Fighter" },
+  { days: 30, xpReward: 500, name: "Monthly Master" },
+  { days: 60, xpReward: 1000, name: "Bimonthly Boss" },
+  { days: 100, xpReward: 2000, name: "Century Champion" },
+  { days: 365, xpReward: 5000, name: "Year-Long Legend" },
+];
+
+// Add a function to check for streak milestones
+const checkStreakMilestones = (currentStreak: number, previousStreak: number) => {
+  // Find milestones that were crossed with this streak update
+  const newMilestones = STREAK_MILESTONES.filter(
+    milestone => currentStreak >= milestone.days && previousStreak < milestone.days
+  );
+  
+  return newMilestones;
+};
 
 export function QuestProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -298,9 +320,27 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       
       // If the user was active yesterday, increment the streak
       // Otherwise, reset the streak
+      const newStreakDays = diffDays === 1 ? user.streakDays + 1 : 0;
+      
+      // Check if any streak milestones were reached
+      const achievedMilestones = checkStreakMilestones(newStreakDays, user.streakDays);
+      
+      // Calculate total XP reward from milestones
+      let streakXpReward = 0;
+      let streakMilestoneNames: string[] = [];
+      
+      if (achievedMilestones.length > 0) {
+        // Sum up XP rewards from all achieved milestones
+        streakXpReward = achievedMilestones.reduce((total, milestone) => total + milestone.xpReward, 0);
+        streakMilestoneNames = achievedMilestones.map(milestone => milestone.name);
+        
+        console.log(`Achieved streak milestones: ${streakMilestoneNames.join(', ')} for ${streakXpReward} XP`);
+      }
+      
+      // Update user with streak and any milestone rewards
       const updatedUser = {
         ...user,
-        streakDays: diffDays === 1 ? user.streakDays + 1 : 0,
+        streakDays: newStreakDays,
         lastActive: today,
         // Reset lastRecurringCheck to force generation of new instances for the day
         lastRecurringCheck: undefined
@@ -317,6 +357,70 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       
       for (const completedInstance of completedInstances) {
         updateTaskHistory(completedInstance);
+      }
+      
+      // Apply streak milestone rewards if any were achieved
+      if (streakXpReward > 0) {
+        // Add XP from streak milestones
+        const updatedXp = updatedUser.xp + streakXpReward;
+        const updatedTotalXp = updatedUser.totalXp + streakXpReward;
+        
+        // Calculate new level based on updated total XP
+        const newLevelFromStreak = calculateLevel(updatedTotalXp);
+        const xpToNextLevelFromStreak = calculateXpToNextLevel(updatedTotalXp);
+        
+        // Check if this caused a level up
+        if (newLevelFromStreak > updatedUser.level) {
+          // Level up occurred from streak milestone
+          setPrevLevel(updatedUser.level);
+          setNewLevel(newLevelFromStreak);
+          setIsLevelUp(true);
+          
+          // Update stats for the streak milestone XP
+          updateDailyStats(0, streakXpReward, today);
+          
+          // Create a special "Streak Milestone" task in history for the XP gain
+          const streakMilestoneTask: Task = {
+            id: uuidv4(),
+            title: `Streak Milestone: ${streakMilestoneNames.join(', ')}`,
+            description: `Earned ${streakXpReward} XP for maintaining a ${newStreakDays}-day streak!`,
+            completed: true,
+            createdAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+            difficulty: 'medium', // Default difficulty for milestone rewards
+            xpReward: streakXpReward
+          };
+          
+          updateTaskHistory(streakMilestoneTask);
+          
+          // Update user with new level info
+          updatedUser.level = newLevelFromStreak;
+          updatedUser.xp = updatedXp;
+          updatedUser.totalXp = updatedTotalXp;
+          updatedUser.xpToNextLevel = xpToNextLevelFromStreak;
+        } else {
+          // No level up, just add the XP
+          updatedUser.xp = updatedXp;
+          updatedUser.totalXp = updatedTotalXp;
+          updatedUser.xpToNextLevel = xpToNextLevelFromStreak;
+          
+          // Update stats for the streak milestone XP
+          updateDailyStats(0, streakXpReward, today);
+          
+          // Create a special "Streak Milestone" task in history for the XP gain
+          const streakMilestoneTask: Task = {
+            id: uuidv4(),
+            title: `Streak Milestone: ${streakMilestoneNames.join(', ')}`,
+            description: `Earned ${streakXpReward} XP for maintaining a ${newStreakDays}-day streak!`,
+            completed: true,
+            createdAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+            difficulty: 'medium', // Default difficulty for milestone rewards
+            xpReward: streakXpReward
+          };
+          
+          updateTaskHistory(streakMilestoneTask);
+        }
       }
       
       setUser(updatedUser);
