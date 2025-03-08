@@ -10,7 +10,8 @@ import {
   Title,
   Tooltip,
   Legend,
-  BarElement
+  BarElement,
+  Filler
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 import { getStats, getLocalDateString } from '../utils/storageUtils';
@@ -26,7 +27,8 @@ ChartJS.register(
   BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
 // Chart options

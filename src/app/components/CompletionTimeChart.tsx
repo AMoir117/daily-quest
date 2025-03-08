@@ -9,6 +9,7 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler,
   ChartOptions
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
@@ -23,7 +24,8 @@ if (typeof window !== 'undefined') {
     BarElement,
     Title,
     Tooltip,
-    Legend
+    Legend,
+    Filler
   );
 }
 
