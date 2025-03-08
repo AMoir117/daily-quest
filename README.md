@@ -1,20 +1,11 @@
-This is a todo app gamer brainrotified, made it in a couple hours with cursor+claude. 
+This is a todo app gamer brainrotified, made it in a day with cursor+claude. I plan to use this daily to track my productivity.
 
-## Getting Started
+## UI Example
 
-Run next js project
+![Daily Quest GIF](C:\Users\andym\DailyQuest\daily-quest\media\dailyquest-f.gif)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
 ## Deployed on Vercel
 
-[Current Build](https://daily-quest-6n8dp8ht5-amoir117s-projects.vercel.app/)
+[Previous Build](https://daily-quest-6n8dp8ht5-amoir117s-projects.vercel.app/)
 
