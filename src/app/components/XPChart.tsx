@@ -11,7 +11,7 @@ import {
   Tooltip,
   Legend,
   BarElement,
-  Filler
+  Filler,
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 import { getStats, getLocalDateString } from '../utils/storageUtils';

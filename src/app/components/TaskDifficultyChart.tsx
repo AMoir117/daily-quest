@@ -10,7 +10,8 @@ import {
   Tooltip,
   Legend,
   Filler,
-  ChartOptions
+  ChartOptions,
+  ChartData
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { useQuest } from '../context/QuestContext';
@@ -31,7 +32,7 @@ if (typeof window !== 'undefined') {
 }
 
 // Only attempt to render the chart on the client side
-function safeChartRender(chartData: any, options: ChartOptions<'bar'>) {
+function safeChartRender(chartData: ChartData<'bar'>, options: ChartOptions<'bar'>) {
   try {
     return <Bar options={options} data={chartData} />;
   } catch (error) {
