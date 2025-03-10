@@ -121,6 +121,15 @@ const lineOptions = {
 const barOptions = {
   responsive: true,
   maintainAspectRatio: false,
+  elements: {
+    line: {
+      tension: 0 // Disables bezier curves, uses straight lines
+    },
+    point: {
+      radius: 4,
+      hitRadius: 10
+    }
+  },
   plugins: {
     legend: {
       position: 'top' as const,
@@ -152,7 +161,8 @@ const barOptions = {
       ticks: {
         font: {
           family: 'monospace'
-        }
+        },
+        precision: 0 // Only show whole numbers for quest counts
       }
     }
   }
@@ -316,15 +326,122 @@ export default function XPChart() {
     ]
   };
   
-  const barData = {
+  // Modified to include cumulative quests
+  const questsData = {
     labels: stats.map(stat => formatDate(stat.date)),
     datasets: [
       {
-        label: 'Quests Completed',
+        label: 'Cumulative Quests',
+        data: stats.reduce((acc: number[], stat, index) => {
+          // Calculate cumulative sum
+          const previousTotal = index > 0 ? acc[index - 1] : 0;
+          acc.push(previousTotal + stat.tasksCompleted);
+          return acc;
+        }, []),
+        borderColor: 'rgb(147, 51, 234)',
+        backgroundColor: 'rgba(147, 51, 234, 0.5)',
+        tension: 0,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: false,
+        yAxisID: 'y'
+      },
+      {
+        label: 'Daily Quests',
         data: stats.map(stat => stat.tasksCompleted),
-        backgroundColor: 'rgba(59, 130, 246, 0.7)'
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+        tension: 0,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: false,
+        yAxisID: 'y1',
+        borderDash: [5, 5]
       }
     ]
+  };
+  
+  // Update quests chart options to include dual Y axes
+  const questsOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    elements: {
+      line: {
+        tension: 0 // Disables bezier curves, uses straight lines
+      },
+      point: {
+        radius: 4,
+        hitRadius: 10
+      }
+    },
+    plugins: {
+      legend: {
+        position: 'top' as const,
+        labels: {
+          font: {
+            family: 'monospace'
+          }
+        }
+      },
+      title: {
+        display: true,
+        text: 'Quests Completed Over Time',
+        font: {
+          family: 'monospace',
+          size: 16
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: {
+          font: {
+            family: 'monospace'
+          }
+        }
+      },
+      y: {
+        type: 'linear' as const,
+        display: true,
+        position: 'left' as const,
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Cumulative Quests',
+          font: {
+            family: 'monospace'
+          }
+        },
+        ticks: {
+          font: {
+            family: 'monospace'
+          },
+          precision: 0
+        }
+      },
+      y1: {
+        type: 'linear' as const,
+        display: true,
+        position: 'right' as const,
+        beginAtZero: true,
+        grid: {
+          drawOnChartArea: false,
+        },
+        title: {
+          display: true,
+          text: 'Daily Quests',
+          font: {
+            family: 'monospace'
+          }
+        },
+        ticks: {
+          font: {
+            family: 'monospace'
+          },
+          precision: 0
+        }
+      }
+    }
   };
   
   // Prepare velocity chart data
@@ -344,20 +461,43 @@ export default function XPChart() {
     ]
   };
   
-  // Render chart based on type
+  // Render only the XP chart
   const renderChart = () => {
     if (!isDataReady || stats.length === 0) {
       return <div className="flex items-center justify-center h-full">Loading chart data...</div>;
     }
 
     try {
-      if (chartType === 'line') {
-        return <Line options={lineOptions} data={lineData} />;
-      } else if (chartType === 'bar') {
-        return <Bar options={barOptions} data={barData} />;
-      } else {
-        return <Line options={velocityOptions} data={velocityChartData} />;
-      }
+      return (
+        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-mono">XP Progress</h2>
+            <button
+              onClick={() => setChartType(chartType === 'velocity' ? 'line' : 'velocity')}
+              className="px-3 py-1 rounded font-mono text-sm bg-purple-600 text-white hover:bg-purple-700"
+            >
+              {chartType === 'velocity' ? 'Show Progress' : 'Show Velocity'}
+            </button>
+          </div>
+          
+          <div className="h-48">
+            {chartType === 'velocity' ? (
+              <Line options={velocityOptions} data={velocityChartData} />
+            ) : (
+              <Line options={lineOptions} data={lineData} />
+            )}
+          </div>
+          
+          {chartType === 'velocity' && velocityData.length > 0 && (
+            <div className="mt-4 text-sm text-gray-400 font-mono">
+              <p>XP Velocity shows your average daily XP gain over a 7-day period. Higher values indicate increased productivity.</p>
+              <p className="mt-2">
+                Current velocity: <span className="text-orange-400 font-bold">{Math.round(velocityData[velocityData.length - 1])} XP/day</span>
+              </p>
+            </div>
+          )}
+        </div>
+      );
     } catch (error) {
       console.error('Error rendering chart:', error);
       return <div className="text-red-500">Error rendering chart. Please try refreshing.</div>;
@@ -366,57 +506,11 @@ export default function XPChart() {
   
   if (stats.length === 0) {
     return (
-      <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 h-64 flex items-center justify-center mb-6">
+      <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 h-40 flex items-center justify-center">
         <p className="text-gray-400 font-mono">Complete quests to see your progress over time!</p>
       </div>
     );
   }
   
-  return (
-    <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-mono">Charts</h2>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => setChartType('line')}
-            className={`px-3 py-1 rounded font-mono text-sm ${
-              chartType === 'line' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'
-            }`}
-          >
-            Progress
-          </button>
-          <button
-            onClick={() => setChartType('velocity')}
-            className={`px-3 py-1 rounded font-mono text-sm ${
-              chartType === 'velocity' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'
-            }`}
-          >
-            Velocity
-          </button>
-          <button
-            onClick={() => setChartType('bar')}
-            className={`px-3 py-1 rounded font-mono text-sm ${
-              chartType === 'bar' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'
-            }`}
-          >
-            Quests/Day
-          </button>
-        </div>
-      </div>
-      <div className="h-80">
-        {renderChart()}
-      </div>
-      
-      {chartType === 'velocity' && (
-        <div className="mt-4 text-sm text-gray-400 font-mono">
-          <p>XP Velocity shows your average daily XP gain over a 7-day period. Higher values indicate increased productivity.</p>
-          {velocityData.length > 0 && (
-            <p className="mt-2">
-              Current velocity: <span className="text-orange-400 font-bold">{Math.round(velocityData[velocityData.length - 1])} XP/day</span>
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  return renderChart();
 } 

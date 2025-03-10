@@ -7,6 +7,7 @@ import TaskForm from './components/TaskForm';
 import LevelUpModal from './components/LevelUpModal';
 import UserStats from './components/UserStats';
 import XPChart from './components/XPChart';
+import QuestsChart from './components/QuestsChart';
 import ActivityHeatmap from './components/ActivityHeatmap';
 import TaskDifficultyChart from './components/TaskDifficultyChart';
 import CompletionTimeChart from './components/CompletionTimeChart';
@@ -101,9 +102,14 @@ export default function Home() {
         {/* Visualizations section */}
         <div className="mb-8">
           <h2 className="text-xl font-mono mb-4 border-b border-gray-700 pb-2">Visualizations</h2>
-          <XPChart />
-          <TaskDifficultyChart />
-          <CompletionTimeChart />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <XPChart />
+            <QuestsChart />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <TaskDifficultyChart />
+            <CompletionTimeChart />
+          </div>
           <ActivityHeatmap />
         </div>
         

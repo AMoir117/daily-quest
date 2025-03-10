@@ -149,16 +149,8 @@ export default function TaskDifficultyChart() {
       {
         label: 'Completed',
         data: chartData.completedCounts,
-        backgroundColor: [
-          'rgba(34, 197, 94, 0.8)', // green-500
-          'rgba(249, 115, 22, 0.8)', // orange-500
-          'rgba(239, 68, 68, 0.8)',  // red-500
-        ],
-        borderColor: [
-          'rgb(34, 197, 94)', // green-500
-          'rgb(249, 115, 22)', // orange-500
-          'rgb(239, 68, 68)', // red-500
-        ],
+        backgroundColor: 'rgba(34, 197, 94, 0.8)', // green-500 - consistent color for completed
+        borderColor: 'rgb(34, 197, 94)', // green-500
         borderWidth: 1,
       },
       {
@@ -257,7 +249,7 @@ export default function TaskDifficultyChart() {
   }
 
   return (
-    <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
+    <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
       <h2 className="text-xl font-mono mb-4">Task Difficulty Distribution</h2>
       
       <div className="grid grid-cols-1 gap-4">
@@ -285,13 +277,10 @@ export default function TaskDifficultyChart() {
             
             return (
               <div key={difficulty} className="text-center">
-                <div className={`text-sm font-bold ${
-                  difficulty === 'easy' ? 'text-green-500' : 
-                  difficulty === 'medium' ? 'text-orange-500' : 'text-red-500'
-                } font-mono`}>
+                <div className="text-sm font-bold text-white font-mono">
                   {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
                 </div>
-                <div className="text-xs text-gray-400 font-mono">
+                <div className="text-xs text-green-500 font-mono">
                   Completed: {completedCount}
                   ({completedPercentage}%)
                 </div>

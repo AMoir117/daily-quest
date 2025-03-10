@@ -368,10 +368,10 @@ export default function CompletionTimeChart() {
   };
 
   return (
-    <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
+    <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
       <h2 className="text-xl font-mono mb-4">Productive Hours</h2>
       
-      <div className="h-64">
+      <div className="h-48">
         {safeChartRender(chartData, options)}
       </div>
 
