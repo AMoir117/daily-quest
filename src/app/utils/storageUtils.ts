@@ -5,6 +5,8 @@ const TASKS_KEY = 'dailyquest_tasks';
 const USER_KEY = 'dailyquest_user';
 const STATS_KEY = 'dailyquest_stats';
 const HISTORY_KEY = 'dailyquest_history';
+const QUEST_TYPES_KEY = 'dailyquest_quest_types';
+const FAILED_TASKS_KEY = 'dailyquest_failed_tasks';
 
 // Helper function to get today's date in YYYY-MM-DD format based on local timezone
 export function getLocalDateString(): string {
@@ -19,9 +21,11 @@ export const DEFAULT_USER: User = {
   totalXp: 0,
   xpToNextLevel: 100,
   tasksCompleted: 0,
+  tasksFailed: 0,
   streakDays: 0,
   lastActive: getLocalDateString(), // Today's date in local timezone format
-  lastRecurringCheck: undefined
+  lastRecurringCheck: undefined,
+  failedXp: 0
 };
 
 // Helper to check if we're in a browser environment
@@ -298,6 +302,39 @@ export function updateTaskHistory(task: Task): void {
   }
 }
 
+// Function to get failed tasks from storage
+export function getFailedTasks(): Task[] {
+  return getFromStorage<Task[]>(FAILED_TASKS_KEY, []);
+}
+
+// Function to save failed tasks to storage
+export function saveFailedTasks(tasks: Task[]): void {
+  saveToStorage<Task[]>(FAILED_TASKS_KEY, tasks);
+}
+
+// Add failed task to history and failed tasks storage
+export function storeFailedTask(task: Task): void {
+  // First add to standard task history
+  updateTaskHistory(task);
+  
+  // Then add to special failed tasks storage
+  const failedTasks = getFailedTasks();
+  
+  // Check if task already exists
+  const existingTaskIndex = failedTasks.findIndex(t => t.id === task.id);
+  
+  if (existingTaskIndex >= 0) {
+    // Update existing task
+    failedTasks[existingTaskIndex] = task;
+  } else {
+    // Add new failed task
+    failedTasks.push(task);
+  }
+  
+  // Save updated failed tasks
+  saveFailedTasks(failedTasks);
+}
+
 // Function to clear all DailyQuest data from localStorage
 export function clearStorage(): void {
   if (!isBrowser) return;
@@ -307,8 +344,11 @@ export function clearStorage(): void {
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(STATS_KEY);
     localStorage.removeItem(HISTORY_KEY);
+    localStorage.removeItem(QUEST_TYPES_KEY);
+    localStorage.removeItem(FAILED_TASKS_KEY);
+    console.log('All DailyQuest data cleared from localStorage');
   } catch (error) {
-    console.error('Error clearing DailyQuest data from localStorage:', error);
+    console.error('Error clearing DailyQuest data:', error);
   }
 }
 
@@ -471,4 +511,13 @@ export function cleanupDuplicateTasks(): void {
   } catch (error) {
     console.error('Error cleaning up duplicate tasks:', error);
   }
+}
+
+// Quest types functions
+export function getQuestTypes(): string[] {
+  return getFromStorage<string[]>(QUEST_TYPES_KEY, []);
+}
+
+export function saveQuestTypes(types: string[]): void {
+  saveToStorage(QUEST_TYPES_KEY, types);
 } 

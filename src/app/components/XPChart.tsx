@@ -375,7 +375,7 @@ export default function XPChart() {
   return (
     <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-mono">C</h2>
+        <h2 className="text-xl font-mono">Charts</h2>
         <div className="flex space-x-2">
           <button
             onClick={() => setChartType('line')}

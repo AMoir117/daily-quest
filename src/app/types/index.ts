@@ -13,6 +13,7 @@ export interface Task {
   isRecurring?: boolean;
   recurringDays?: DayOfWeek[];
   parentTaskId?: string; // For tasks generated from recurring tasks
+  questType?: string; // Custom quest type for categorization
 }
 
 export interface User {
@@ -21,9 +22,11 @@ export interface User {
   totalXp: number;
   xpToNextLevel: number;
   tasksCompleted: number;
+  tasksFailed: number;
   streakDays: number;
   lastActive: string;
   lastRecurringCheck?: string; // Date when recurring tasks were last generated
+  failedXp: number; // Track total XP lost from failed quests
 }
 
 export interface DailyStats {

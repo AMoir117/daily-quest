@@ -14,7 +14,7 @@ import { useQuest } from '../context/QuestContext';
 interface QuestSuggestionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectQuest: (title: string, description: string, difficulty: TaskDifficulty) => void;
+  onSelectQuest: (title: string, description: string, difficulty: TaskDifficulty, questType?: string) => void;
 }
 
 export default function QuestSuggestionModal({
@@ -28,7 +28,9 @@ export default function QuestSuggestionModal({
   // Get new suggestions when the modal opens
   useEffect(() => {
     if (isOpen) {
-      setSuggestions(getRecurringAndUnexpectedSuggestions(tasks));
+      const newSuggestions = getRecurringAndUnexpectedSuggestions(tasks);
+      console.log("Generated suggestions:", newSuggestions.map(s => ({ title: s.title, category: s.category })));
+      setSuggestions(newSuggestions);
     }
   }, [isOpen, tasks]);
   
@@ -45,8 +47,7 @@ export default function QuestSuggestionModal({
   };
 
   // Category label mapping
-  const categoryLabels: Record<QuestCategory, { text: string, classes: string }> = {
-    recurring: { text: 'RECURRING', classes: 'bg-blue-900/50 text-blue-300' },
+  const categoryLabels: Record<string, { text: string, classes: string }> = {
     health: { text: 'HEALTH', classes: 'bg-green-900/50 text-green-300' },
     productivity: { text: 'PRODUCTIVITY', classes: 'bg-yellow-900/50 text-yellow-300' },
     personal: { text: 'PERSONAL', classes: 'bg-purple-900/50 text-purple-300' },
@@ -93,7 +94,7 @@ export default function QuestSuggestionModal({
             </div>
             
             <p className="text-sm text-gray-400 mb-4">
-              Choose from everyday recurring tasks and one random challenge to add to your quest log.
+              Choose a quest to add to your quest log.
             </p>
             
             <div className="space-y-4 mb-6">
@@ -103,14 +104,13 @@ export default function QuestSuggestionModal({
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className={`p-4 border border-gray-700 rounded-md bg-gray-900 cursor-pointer hover:border-purple-500 transition-colors ${
-                    suggestion.category !== 'recurring' ? 'border-l-4 border-l-purple-500' : ''
-                  }`}
+                  className="p-4 border border-gray-700 rounded-md bg-gray-900 cursor-pointer hover:border-purple-500 transition-colors"
                   onClick={() => {
                     onSelectQuest(
                       suggestion.title,
                       suggestion.description,
-                      suggestion.difficulty
+                      suggestion.difficulty,
+                      suggestion.category
                     );
                     onClose();
                   }}

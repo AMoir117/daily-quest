@@ -15,8 +15,8 @@ import {
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { useQuest } from '../context/QuestContext';
-import { Task, TaskDifficulty } from '../types';
-import { getHistory } from '../utils/storageUtils';
+import { TaskDifficulty } from '../types';
+import { getFailedTasks } from '../utils/storageUtils';
 
 // Register Chart.js components
 if (typeof window !== 'undefined') {
@@ -46,15 +46,19 @@ function safeChartRender(chartData: ChartData<'bar'>, options: ChartOptions<'bar
 }
 
 export default function TaskDifficultyChart() {
-  const { tasks } = useQuest();
+  const { tasks, user } = useQuest();
   const [chartData, setChartData] = useState<{
     completedCounts: number[];
+    failedCounts: number[];
     totalCounts: number[];
     completionRates: number[];
+    failureRates: number[];
   }>({
     completedCounts: [0, 0, 0],
+    failedCounts: [0, 0, 0],
     totalCounts: [0, 0, 0],
     completionRates: [0, 0, 0],
+    failureRates: [0, 0, 0],
   });
   const [isClient, setIsClient] = useState(false);
 
@@ -67,51 +71,27 @@ export default function TaskDifficultyChart() {
     if (typeof window === 'undefined') return;
     
     // Process task data to get difficulty distribution
-    const getTaskDifficultyDistribution = (tasks: Task[]) => {
-      // Get task history to track uncompleted recurring tasks
-      const taskHistory = getHistory();
-      
-      // Create a set to track recurring task IDs that were not completed
-      const uncompletedRecurringTaskIds = new Set<string>();
-      
-      // Go through history to find uncompleted recurring tasks
-      taskHistory.forEach(dayHistory => {
-        dayHistory.tasks.forEach(historyTask => {
-          // If it's a recurring task instance and wasn't completed
-          if (historyTask.parentTaskId && !historyTask.completed) {
-            uncompletedRecurringTaskIds.add(historyTask.id);
-          }
-        });
-      });
+    const getTaskDifficultyDistribution = () => {
+      // Get task history and failed tasks
+      const failedTasksList = getFailedTasks();
       
       // Filter out recurring task templates but keep recurring task instances
       // Templates have isRecurring=true, while instances have parentTaskId set
       const filteredTasks = tasks.filter(task => !task.isRecurring || task.parentTaskId);
       
-      // Create a virtual list of tasks that includes current tasks and historical uncompleted recurring tasks
+      // Create a virtual list of tasks that includes current tasks
       const virtualTaskList = [...filteredTasks];
-      
-      // Add uncompleted recurring tasks from history that aren't in the current task list
-      // (These are tasks that reset when the day changed)
-      taskHistory.forEach(dayHistory => {
-        dayHistory.tasks.forEach(historyTask => {
-          if (historyTask.parentTaskId && !historyTask.completed && 
-              !filteredTasks.some(task => task.id === historyTask.id)) {
-            // This is a recurring task that wasn't completed and is no longer in the current task list
-            virtualTaskList.push(historyTask);
-          }
-        });
-      });
       
       // Initialize counters for each difficulty
       const difficulties: TaskDifficulty[] = ['easy', 'medium', 'hard'];
       const completedByDifficulty = [0, 0, 0];
+      const failedByDifficulty = [0, 0, 0];
       const totalByDifficulty = [0, 0, 0];
       
       // Track processed task IDs to avoid counting the same task multiple times
       const processedTaskIds = new Set<string>();
       
-      // Count tasks by difficulty
+      // Count completed tasks by difficulty
       virtualTaskList.forEach(task => {
         // Skip if we've already processed this task
         if (processedTaskIds.has(task.id)) return;
@@ -127,20 +107,40 @@ export default function TaskDifficultyChart() {
         }
       });
       
-      // Calculate completion rates
+      // Count failed tasks by difficulty
+      failedTasksList.forEach(task => {
+        const difficultyIndex = difficulties.indexOf(task.difficulty);
+        if (difficultyIndex !== -1) {
+          // Only increment total if this task wasn't already counted
+          if (!processedTaskIds.has(task.id)) {
+            totalByDifficulty[difficultyIndex]++;
+            processedTaskIds.add(task.id);
+          }
+          
+          failedByDifficulty[difficultyIndex]++;
+        }
+      });
+      
+      // Calculate completion and failure rates
       const completionRates = difficulties.map((_, index) => 
         totalByDifficulty[index] ? (completedByDifficulty[index] / totalByDifficulty[index]) * 100 : 0
       );
       
+      const failureRates = difficulties.map((_, index) => 
+        totalByDifficulty[index] ? (failedByDifficulty[index] / totalByDifficulty[index]) * 100 : 0
+      );
+      
       return {
         completedCounts: completedByDifficulty,
+        failedCounts: failedByDifficulty,
         totalCounts: totalByDifficulty,
-        completionRates
+        completionRates,
+        failureRates
       };
     };
 
-    setChartData(getTaskDifficultyDistribution(tasks));
-  }, [tasks]);
+    setChartData(getTaskDifficultyDistribution());
+  }, [tasks, user.tasksFailed]); // Also update when tasksFailed count changes
 
   // Prepare data for the horizontal bar chart
   const barData = {
@@ -162,10 +162,10 @@ export default function TaskDifficultyChart() {
         borderWidth: 1,
       },
       {
-        label: 'Incomplete',
-        data: chartData.totalCounts.map((total, index) => total - chartData.completedCounts[index]),
-        backgroundColor: 'rgba(75, 85, 99, 0.5)', // gray-600
-        borderColor: 'rgb(75, 85, 99)', // gray-600
+        label: 'Failed',
+        data: chartData.failedCounts,
+        backgroundColor: 'rgba(251, 191, 36, 0.7)', // amber-500
+        borderColor: 'rgb(251, 191, 36)', // amber-500
         borderWidth: 1,
       }
     ],
@@ -226,8 +226,13 @@ export default function TaskDifficultyChart() {
             const index = tooltipItems[0].dataIndex;
             const total = chartData.totalCounts[index];
             const completed = chartData.completedCounts[index];
-            const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
-            return `Completion Rate: ${rate}%`;
+            const failed = chartData.failedCounts[index];
+            const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+            const failureRate = total > 0 ? Math.round((failed / total) * 100) : 0;
+            return [
+              `Completion Rate: ${completionRate}%`,
+              `Failure Rate: ${failureRate}%`
+            ];
           }
         }
       }
@@ -243,7 +248,7 @@ export default function TaskDifficultyChart() {
     );
   }
   
-  if (tasks.filter(task => !task.isRecurring || task.parentTaskId).length === 0) {
+  if (tasks.filter(task => !task.isRecurring || task.parentTaskId).length === 0 && chartData.failedCounts.every(count => count === 0)) {
     return (
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 h-40 flex items-center justify-center mb-6">
         <p className="text-gray-400 font-mono">Complete quests to see difficulty distribution!</p>
@@ -263,22 +268,40 @@ export default function TaskDifficultyChart() {
         
         {/* Completion rate stats */}
         <div className="grid grid-cols-3 gap-2">
-          {['easy', 'medium', 'hard'].map((difficulty, index) => (
-            <div key={difficulty} className="text-center">
-              <div className={`text-sm font-bold ${
-                difficulty === 'easy' ? 'text-green-500' : 
-                difficulty === 'medium' ? 'text-orange-500' : 'text-red-500'
-              } font-mono`}>
-                {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+          {['easy', 'medium', 'hard'].map((difficulty, index) => {
+            // Calculate the total of completed and failed tasks for this difficulty
+            const completedCount = chartData.completedCounts[index];
+            const failedCount = chartData.failedCounts[index];
+            const relevantTotal = completedCount + failedCount;
+            
+            // Calculate percentages based only on completed and failed tasks
+            const completedPercentage = relevantTotal > 0 
+              ? Math.round((completedCount / relevantTotal) * 100) 
+              : 0;
+            
+            const failedPercentage = relevantTotal > 0 
+              ? Math.round((failedCount / relevantTotal) * 100) 
+              : 0;
+            
+            return (
+              <div key={difficulty} className="text-center">
+                <div className={`text-sm font-bold ${
+                  difficulty === 'easy' ? 'text-green-500' : 
+                  difficulty === 'medium' ? 'text-orange-500' : 'text-red-500'
+                } font-mono`}>
+                  {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                </div>
+                <div className="text-xs text-gray-400 font-mono">
+                  Completed: {completedCount}
+                  ({completedPercentage}%)
+                </div>
+                <div className="text-xs text-amber-400 font-mono">
+                  Failed: {failedCount}
+                  ({failedPercentage}%)
+                </div>
               </div>
-              <div className="text-xs text-gray-400 font-mono">
-                {chartData.completedCounts[index]}/{chartData.totalCounts[index]} 
-                ({chartData.totalCounts[index] > 0 
-                  ? Math.round((chartData.completedCounts[index] / chartData.totalCounts[index]) * 100) 
-                  : 0}%)
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

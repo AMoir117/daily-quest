@@ -8,13 +8,16 @@ import {
   getUser, saveUser, 
   updateDailyStats, 
   updateTaskHistory,
-  DEFAULT_USER,
   getStats,
   saveStats,
   getDayOfWeek,
   getLocalDateString,
   cleanupFutureDates,
-  cleanupDuplicateTasks
+  cleanupDuplicateTasks,
+  getQuestTypes,
+  saveQuestTypes,
+  storeFailedTask,
+  getFailedTasks
 } from '../utils/storageUtils';
 import { 
   XP_REWARDS, 
@@ -26,11 +29,12 @@ import {
 interface QuestContextType {
   tasks: Task[];
   user: User;
-  addTask: (title: string, description: string, difficulty: TaskDifficulty, isRecurring?: boolean, recurringDays?: DayOfWeek[]) => void;
+  questTypes: string[];
+  addTask: (title: string, description: string, difficulty: TaskDifficulty, isRecurring?: boolean, recurringDays?: DayOfWeek[], questType?: string) => void;
   completeTask: (id: string) => boolean;
   undoTask: (id: string) => void;
   deleteTask: (id: string) => void;
-  editTask: (id: string, title: string, description: string, difficulty: TaskDifficulty, isRecurring?: boolean, recurringDays?: DayOfWeek[]) => void;
+  editTask: (id: string, title: string, description: string, difficulty: TaskDifficulty, isRecurring?: boolean, recurringDays?: DayOfWeek[], questType?: string) => void;
   copyTask: (id: string) => void;
   isLevelUp: boolean;
   dismissLevelUp: () => void;
@@ -39,7 +43,11 @@ interface QuestContextType {
   prevLevel: number;
   newLevel: number;
   levelUpData: { oldLevel: number, newLevel: number };
-  forceRegenerateRecurringTasks: () => void;
+  failRecurringTask: (task: Task) => boolean;
+  checkForFailedTasks: () => void;
+  addQuestType: (type: string) => void;
+  setUser: (user: User) => void;
+  saveUser: (user: User) => void;
 }
 
 const QuestContext = createContext<QuestContextType | undefined>(undefined);
@@ -65,108 +73,77 @@ const checkStreakMilestones = (currentStreak: number, previousStreak: number) =>
   return newMilestones;
 };
 
+// Constants for failed task penalties
+const FAILED_TASK_PENALTIES = {
+  easy: 5,
+  medium: 10,
+  hard: 20
+};
+
+// Initialize default user
+const INITIAL_USER: User = {
+  level: 1,
+  xp: 0,
+  totalXp: 0,
+  xpToNextLevel: 100,
+  tasksCompleted: 0,
+  tasksFailed: 0,
+  streakDays: 0,
+  lastActive: '',
+  failedXp: 0
+};
+
 export function QuestProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [user, setUser] = useState<User>(DEFAULT_USER);
+  const [user, setUser] = useState<User>(INITIAL_USER);
   const [isLevelUp, setIsLevelUp] = useState(false);
   const [prevTotalXp, setPrevTotalXp] = useState(0);
   const [prevLevel, setPrevLevel] = useState(1);
   const [newLevel, setNewLevel] = useState(1);
+  const [questTypes, setQuestTypes] = useState<string[]>([]);
   
   // Use refs to store level values for the level-up modal
   const levelUpDataRef = React.useRef({ oldLevel: 1, newLevel: 1 });
 
   // Generate tasks from recurring tasks
   const generateRecurringTasks = useCallback((today: string) => {
-    console.log('Generating recurring tasks for', today);
+    console.log('Checking for recurring tasks due today:', today);
     
-    // Get the day of the week
-    const currentDate = new Date(today);
+    // Parse the date string to get a Date object for today
+    const currentDate = new Date(`${today}T12:00:00`);
     const dayOfWeek = getDayOfWeek(currentDate);
-    console.log('Current day of week:', dayOfWeek);
     
-    // For each recurring task, ensure past instances remain completed
-    // but create new instances for today if needed
-    
-    // 1. First, find all recurring tasks for today's day of week
-    const recurringTasks = tasks.filter(task => 
+    // 1. Find all recurring templates scheduled for today's day of week
+    const recurringTemplatesForToday = tasks.filter(task => 
       task.isRecurring && 
       task.recurringDays && 
       task.recurringDays.includes(dayOfWeek)
     );
-    console.log('Found recurring tasks for today:', recurringTasks.length);
     
-    // 2. Deduplicate recurring templates - keep only one template with the same title
-    const uniqueTemplates = recurringTasks.reduce((unique: Task[], template) => {
-      if (!unique.some(t => t.title === template.title)) {
-        unique.push(template);
-      }
-      return unique;
-    }, []);
-    console.log('Unique recurring templates:', uniqueTemplates.length);
-    
-    if (uniqueTemplates.length === 0) {
-      // No recurring tasks to generate, just update the lastRecurringCheck
-      const updatedUser = {
-        ...user,
-        lastRecurringCheck: today
-      };
-      
-      setUser(updatedUser);
-      saveUser(updatedUser);
+    if (recurringTemplatesForToday.length === 0) {
+      console.log('No recurring tasks scheduled for today');
       return;
     }
     
-    // Get existing instances for today
-    const existingTodayInstances = tasks.filter(t => 
-      t.parentTaskId && 
-      t.createdAt && 
-      t.createdAt.startsWith(today)
+    console.log(`Found ${recurringTemplatesForToday.length} recurring templates for ${dayOfWeek}`);
+    
+    // 2. Find all instances for today (both active and completed)
+    const todayInstances = tasks.filter(task => 
+      task.parentTaskId && 
+      (task.createdAt?.startsWith(today) || task.completedAt?.startsWith(today))
     );
-    console.log('Existing instances for today:', existingTodayInstances.length);
     
-    // Get completed instances for today
-    const completedTodayInstances = tasks.filter(t => 
-      t.parentTaskId && 
-      t.completedAt && 
-      t.completedAt.startsWith(today) && 
-      t.completed
-    );
-    console.log('Completed instances for today:', completedTodayInstances.length);
-    
-    // Get yesterday's date for filtering out completed tasks from yesterday
-    const yesterday = new Date(currentDate);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
-    
-    // Filter out any completed tasks from yesterday when creating today's instances
-    const completedYesterdayInstances = tasks.filter(t =>
-      t.parentTaskId &&
-      t.completedAt &&
-      t.completedAt.startsWith(yesterdayStr) &&
-      t.completed
-    );
-    console.log('Completed instances from yesterday:', completedYesterdayInstances.length);
-    
-    // Processed tasks that will replace the current tasks list
-    let updatedTasks = [...tasks];
+    // 3. Create new instances for templates that don't have an instance for today
     const newTasks: Task[] = [];
     
-    // Process each recurring task
-    for (const template of uniqueTemplates) {
-      // Check if this recurring task already has an instance for today
-      const existingTodayInstance = existingTodayInstances.find(t => 
-        t.parentTaskId === template.id
+    recurringTemplatesForToday.forEach(template => {
+      // Check if this template already has an instance for today
+      const hasInstanceForToday = todayInstances.some(instance => 
+        instance.parentTaskId === template.id
       );
       
-      // Check if there's a completed instance for today
-      const completedTodayInstance = completedTodayInstances.find(t => 
-        t.parentTaskId === template.id
-      );
-      
-      // If there's no instance for today and no completed instance, create one
-      if (!existingTodayInstance && !completedTodayInstance) {
-        console.log('Creating new instance for template:', template.title);
+      if (!hasInstanceForToday) {
+        console.log(`Creating instance for "${template.title}"`);
         
         // Create a new instance with today's date
         const now = new Date();
@@ -182,50 +159,33 @@ export function QuestProvider({ children }: { children: ReactNode }) {
           createdAt: isoString,
           completedAt: undefined,
           isRecurring: false,
-          parentTaskId: template.id
+          parentTaskId: template.id,
+          questType: template.questType
         };
         
         newTasks.push(newInstance);
       } else {
-        console.log(
-          'Skipping template, already has instance:',
-          template.title,
-          existingTodayInstance ? 'active' : 'completed'
-        );
+        console.log(`Template "${template.title}" already has instance for today`);
       }
+    });
+    
+    // Only update if we created new tasks
+    if (newTasks.length > 0) {
+      const updatedTasks = [...tasks, ...newTasks];
+      setTasks(updatedTasks);
+      saveTasks(updatedTasks);
+      console.log(`Created ${newTasks.length} new task instances for today`);
+    } else {
+      console.log('No new task instances needed for today');
     }
     
-    if (newTasks.length === 0) {
-      console.log('No new tasks to create');
-      // No new tasks were created, just update the lastRecurringCheck
-      const updatedUser = {
-        ...user,
-        lastRecurringCheck: today
-      };
-      
-      setUser(updatedUser);
-      saveUser(updatedUser);
-      return;
-    }
-    
-    console.log('Created new instances:', newTasks.length);
-    
-    // Add new tasks to the list
-    updatedTasks = [...updatedTasks, ...newTasks];
-    
-    // Update state
-    setTasks(updatedTasks);
-    
-    // Update user with lastRecurringCheck
+    // Update lastRecurringCheck in user data
     const updatedUser = {
       ...user,
       lastRecurringCheck: today
     };
     
     setUser(updatedUser);
-    
-    // Save to localStorage
-    saveTasks(updatedTasks);
     saveUser(updatedUser);
   }, [tasks, user]);
 
@@ -244,6 +204,9 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       // Get user data from localStorage
       const loadedUser = getUser();
       
+      // Get today's date
+      const today = getLocalDateString();
+      
       // Calculate initial XP and level from tasks
       const completedTasks = loadedTasks.filter(task => task.completed);
       const calculatedTotalXp = completedTasks.reduce((total, task) => total + task.xpReward, 0);
@@ -251,11 +214,8 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       // Calculate level
       const calculatedLevel = Math.max(1, calculateLevel(calculatedTotalXp));
       
-      console.log('Initial Load:', {
-        calculatedTotalXp,
-        calculatedLevel,
-        loadedUserLevel: loadedUser.level
-      });
+      // Set initial state
+      setTasks(loadedTasks);
       
       // Update user with calculated values
       const updatedUser = {
@@ -263,21 +223,14 @@ export function QuestProvider({ children }: { children: ReactNode }) {
         totalXp: calculatedTotalXp,
         level: calculatedLevel,
         tasksCompleted: completedTasks.length,
-        lastActive: loadedUser.lastActive || getLocalDateString(),
-        lastRecurringCheck: undefined, // Force recurring task check on load
+        lastActive: today, // Always update to today
         streakDays: loadedUser.streakDays || 0
       };
       
-      // Set initial state
-      setTasks(loadedTasks);
       setUser(updatedUser);
       setPrevTotalXp(calculatedTotalXp);
       setPrevLevel(calculatedLevel);
       setNewLevel(calculatedLevel);
-      
-      // Force generation of today's recurring tasks
-      const today = getLocalDateString();
-      generateRecurringTasks(today);
       
       // Initialize the levelUpDataRef with the current level
       levelUpDataRef.current = {
@@ -285,18 +238,22 @@ export function QuestProvider({ children }: { children: ReactNode }) {
         newLevel: calculatedLevel
       };
       
-      console.log('After Initial Setup:', {
-        levelUpDataRef: levelUpDataRef.current,
-        prevLevel,
-        newLevel
-      });
+      // Check if we need to generate today's recurring tasks
+      if (loadedUser.lastRecurringCheck !== today) {
+        console.log(`Need to check recurring tasks for today (${today})`);
+        // This will update the user's lastRecurringCheck
+        setTimeout(() => generateRecurringTasks(today), 0);
+      } else {
+        console.log(`Already checked recurring tasks for today (${today})`);
+      }
       
       // Save the updated user data
       saveUser(updatedUser);
+      
     } catch (error) {
       console.error('Error loading data from localStorage:', error);
       setTasks([]);
-      setUser(DEFAULT_USER);
+      setUser(INITIAL_USER);
     }
   }, []);
 
@@ -434,26 +391,83 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     }
   }, [user.lastActive, user.lastRecurringCheck, user.streakDays, tasks, prevLevel, newLevel, generateRecurringTasks]);
 
-  const addTask = (title: string, description: string, difficulty: TaskDifficulty, isRecurring = false, recurringDays?: DayOfWeek[]) => {
+  // Load quest types from storage and add default categories from quest suggestions
+  useEffect(() => {
+    const storedQuestTypes = getQuestTypes();
+    
+    // Add default categories from quest suggestions if they don't exist yet
+    const defaultCategories: string[] = ['health', 'productivity', 'personal', 'home', 'tech', 'social'];
+    
+    // Combine stored types with default categories (avoiding duplicates)
+    const combinedTypes = [...storedQuestTypes];
+    
+    defaultCategories.forEach(category => {
+      if (!combinedTypes.includes(category)) {
+        combinedTypes.push(category);
+      }
+    });
+    
+    // Filter out 'recurring' if it somehow got into the list
+    const filteredTypes = combinedTypes.filter(type => type !== 'recurring');
+    
+    setQuestTypes(filteredTypes);
+    saveQuestTypes(filteredTypes);
+  }, []);
+
+  // Add a new quest type, preventing 'recurring' from being added
+  const addQuestType = useCallback((type: string) => {
+    // Convert to uppercase
+    const uppercaseType = type.toUpperCase();
+    
+    // Don't allow adding 'RECURRING' as a quest type
+    if (uppercaseType === 'RECURRING') {
+      console.log("Cannot add 'RECURRING' as a quest type as it's a special property");
+      return;
+    }
+    
+    if (!questTypes.includes(uppercaseType)) {
+      const updatedTypes = [...questTypes, uppercaseType];
+      setQuestTypes(updatedTypes);
+      saveQuestTypes(updatedTypes);
+    }
+  }, [questTypes]);
+  
+
+  const addTask = useCallback((
+    title: string, 
+    description: string, 
+    difficulty: TaskDifficulty, 
+    isRecurring: boolean = false, 
+    recurringDays: DayOfWeek[] = [],
+    questType?: string
+  ) => {
+    const xpReward = XP_REWARDS[difficulty];
+    
+    // Convert questType to uppercase if it exists
+    const uppercaseQuestType = questType ? questType.toUpperCase() : undefined;
+    
     const newTask: Task = {
       id: uuidv4(),
       title,
-      description,
+      description: description || undefined,
       completed: false,
       createdAt: new Date().toISOString(),
       difficulty,
-      xpReward: XP_REWARDS[difficulty],
+      xpReward,
       isRecurring,
-      recurringDays
+      recurringDays: isRecurring ? recurringDays : undefined,
+      questType: uppercaseQuestType
     };
     
     const updatedTasks = [...tasks, newTask];
     setTasks(updatedTasks);
     saveTasks(updatedTasks);
     updateTaskHistory(newTask);
-  };
+  }, [tasks, user, setUser]);
 
   const completeTask = (id: string) => {
+    console.log(`CompleteTask called for task ID: ${id}`);
+    
     // Get fresh tasks from storage instead of using state to avoid race conditions
     const currentTasks = getTasks();
     const taskIndex = currentTasks.findIndex(task => task.id === id);
@@ -561,7 +575,7 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     }
     
     // Update state after successful save
-    setTasks(updatedTasks);
+    setTasks(updatedTasks); // This updates the tasks array with the completed task
     setUser(updatedUser);
     setPrevTotalXp(calculatedTotalXp);
     
@@ -574,6 +588,17 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     if (taskIndex === -1) return;
     
     const task = tasks[taskIndex];
+    
+    // For failed tasks, we don't need to do anything here since the handleUndoFailedTask
+    // function in FailedTasks.tsx already handles restoring the XP penalty
+    if (task.title.startsWith('FAILED:')) {
+      // Just remove the task from the tasks array
+      const updatedTasks = [...tasks];
+      updatedTasks.splice(taskIndex, 1);
+      setTasks(updatedTasks);
+      saveTasks(updatedTasks);
+      return;
+    }
     
     if (!task.completed) return;
     
@@ -660,7 +685,15 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     saveTasks(updatedTasks);
   };
 
-  const editTask = (id: string, title: string, description: string, difficulty: TaskDifficulty, isRecurring = false, recurringDays?: DayOfWeek[]) => {
+  const editTask = useCallback((
+    id: string, 
+    title: string, 
+    description: string, 
+    difficulty: TaskDifficulty, 
+    isRecurring: boolean = false, 
+    recurringDays: DayOfWeek[] = [],
+    questType?: string
+  ) => {
     const taskIndex = tasks.findIndex(task => task.id === id);
     
     if (taskIndex === -1) return;
@@ -671,19 +704,27 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     // Calculate new XP reward
     const newXpReward = XP_REWARDS[difficulty];
     
+    // Convert questType to uppercase if it exists
+    const uppercaseQuestType = questType ? questType.toUpperCase() : undefined;
+    
     // Create updated task
     const updatedTask = {
       ...oldTask,
       title,
-      description,
+      description: description || undefined,
       difficulty,
       xpReward: newXpReward,
       isRecurring,
-      recurringDays: isRecurring ? recurringDays || [] : undefined
+      recurringDays: isRecurring ? recurringDays : undefined,
+      questType: uppercaseQuestType
     };
     
-    const updatedTasks = [...tasks];
-    updatedTasks[taskIndex] = updatedTask;
+    const updatedTasks = tasks.map(task => {
+      if (task.id === id) {
+        return updatedTask;
+      }
+      return task;
+    });
     
     // If the task was completed, update the user's XP
     if (wasCompleted) {
@@ -716,7 +757,7 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     // Update tasks
     setTasks(updatedTasks);
     saveTasks(updatedTasks);
-  };
+  }, [tasks]);
 
   const copyTask = (id: string) => {
     const taskIndex = tasks.findIndex(task => task.id === id);
@@ -751,32 +792,256 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     setIsLevelUp(false);
   };
 
-  // Expose function to force regeneration of today's recurring tasks
-  const forceRegenerateRecurringTasks = useCallback(() => {
+  const failRecurringTask = useCallback((task: Task) => {
+    console.log(`Marking recurring task as failed: ${task.title} (${task.id})`);
+    
+    // Calculate XP penalty based on difficulty
+    const xpPenalty = FAILED_TASK_PENALTIES[task.difficulty] || 5;
+    
+    // Get today's date
     const today = getLocalDateString();
-    console.log('Forcing regeneration of recurring tasks for today:', today);
-    generateRecurringTasks(today);
-  }, [generateRecurringTasks]);
+    const now = new Date();
+    const localTimeOffset = now.getTimezoneOffset() * 60000;
+    const localISOString = new Date(now.getTime() - localTimeOffset).toISOString();
+    
+    // Create a failed task entry
+    const failedTask: Task = {
+      ...task,
+      id: uuidv4(), // Generate a new ID for the failed instance
+      title: `FAILED: ${task.title}`,
+      completed: false, // Mark as NOT completed so it doesn't show in completed section
+      completedAt: localISOString, // Still add completion date for tracking
+      isRecurring: false,
+      parentTaskId: task.id
+    };
+    
+    // Store the failed task in both regular history and the failed tasks list
+    storeFailedTask(failedTask);
+    
+    // Get all failed tasks to calculate total XP penalty
+    const failedTasks = getFailedTasks();
+    const totalXpPenalty = failedTasks.reduce((total, t) => {
+      const penalty = FAILED_TASK_PENALTIES[t.difficulty] || 5;
+      return total + penalty;
+    }, 0) + xpPenalty; // Add the current penalty
+    
+    // Calculate new totalXp after penalty
+    const newTotalXp = Math.max(0, user.totalXp - xpPenalty); // Don't go below 0
+    
+    // Recalculate level based on new totalXp
+    let newLevel = calculateLevel(newTotalXp);
+    
+    // If totalXp would go negative, set level to 0
+    if (user.totalXp - xpPenalty < 0) {
+      newLevel = 0;
+    }
+    
+    // Find XP thresholds for current and next level
+    const currentLevelThreshold = LEVEL_THRESHOLDS.find(threshold => threshold.level === newLevel) || LEVEL_THRESHOLDS[0];
+    const nextLevelThreshold = LEVEL_THRESHOLDS.find(threshold => threshold.level === newLevel + 1) || LEVEL_THRESHOLDS[1];
+    
+    // Calculate XP within current level and XP to next level
+    const xpWithinLevel = Math.max(0, newTotalXp - (currentLevelThreshold?.xpRequired || 0));
+    const xpToNextLevel = Math.max(0, (nextLevelThreshold?.xpRequired || 0) - newTotalXp);
+    
+    // Update user stats
+    const updatedUser = {
+      ...user,
+      totalXp: newTotalXp,
+      level: newLevel,
+      xp: xpWithinLevel,
+      xpToNextLevel: xpToNextLevel,
+      tasksFailed: user.tasksFailed + 1,
+      failedXp: totalXpPenalty, // Update with total XP penalty from all failed tasks
+      lastActive: today
+    };
+    
+    // Save changes
+    setUser(updatedUser);
+    saveUser(updatedUser);
+    
+    // Add the failed task to the tasks array
+    const updatedTasks = [...tasks, failedTask];
+    setTasks(updatedTasks);
+    saveTasks(updatedTasks);
+    
+    // Update daily stats
+    updateDailyStats(0, -xpPenalty);
+    
+    console.log(`Failed task ${task.title}: -${xpPenalty} XP, new total: ${updatedUser.totalXp}, new level: ${updatedUser.level}, total failed XP: ${totalXpPenalty}`);
+    
+    return true;
+  }, [user, tasks]);
+
+  const checkForFailedTasks = useCallback(() => {
+    console.log('Checking for failed recurring tasks...');
+    
+    // Get yesterday's date
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayString = yesterday.toISOString().split('T')[0];
+    
+    // Get day of week for yesterday
+    const yesterdayDayOfWeek = getDayOfWeek(yesterday);
+    
+    console.log(`Checking for incomplete tasks from yesterday (${yesterdayString}, ${yesterdayDayOfWeek})`);
+    
+    // Find all recurring templates that should have been done yesterday
+    const yesterdayTemplates = tasks.filter(task => 
+      task.isRecurring && 
+      task.recurringDays && 
+      task.recurringDays.includes(yesterdayDayOfWeek)
+    );
+    
+    if (yesterdayTemplates.length === 0) {
+      console.log('No recurring tasks scheduled for yesterday');
+      return;
+    }
+    
+    console.log(`Found ${yesterdayTemplates.length} recurring templates for yesterday (${yesterdayDayOfWeek})`);
+    
+    // Find all instances created yesterday
+    const yesterdayInstances = tasks.filter(task => 
+      task.parentTaskId && 
+      (task.createdAt?.startsWith(yesterdayString) || task.completedAt?.startsWith(yesterdayString))
+    );
+    
+    console.log(`Found ${yesterdayInstances.length} task instances from yesterday`);
+    
+    // Track failed tasks
+    const failedTasks: Task[] = [];
+    
+    // Check each template to see if it was completed
+    yesterdayTemplates.forEach(template => {
+      // Find an instance of this template from yesterday
+      const instance = yesterdayInstances.find(t => t.parentTaskId === template.id);
+      
+      // If no instance exists or it wasn't completed, mark as failed
+      if (!instance) {
+        console.log(`Template "${template.title}" had no instance created yesterday - marking as failed`);
+        failedTasks.push(template);
+      } else if (!instance.completed) {
+        console.log(`Template "${template.title}" had an incomplete instance yesterday - marking as failed`);
+        failedTasks.push(template);
+      } else {
+        console.log(`Template "${template.title}" was completed yesterday`);
+      }
+    });
+    
+    // Process all failed tasks
+    if (failedTasks.length > 0) {
+      console.log(`Found ${failedTasks.length} failed tasks from yesterday`);
+      
+      // Calculate total XP penalty
+      let totalPenalty = 0;
+      
+      // Process each failed task
+      failedTasks.forEach(task => {
+        const penalty = FAILED_TASK_PENALTIES[task.difficulty] || 5;
+        totalPenalty += penalty;
+        
+        // Call failRecurringTask for each failed task
+        failRecurringTask(task);
+      });
+      
+      console.log(`Total XP penalty: -${totalPenalty} XP`);
+    } else {
+      console.log('No failed tasks from yesterday!');
+    }
+  }, [tasks, failRecurringTask]);
+
+  // Check for day change and update streak
+  useEffect(() => {
+    if (!user.lastActive) return;
+    
+    const today = getLocalDateString();
+    
+    // If last active date is not today, there was a day change
+    if (user.lastActive !== today) {
+      console.log(`Day change detected: ${user.lastActive} → ${today}`);
+      
+      // Check for missed/failed tasks from yesterday
+      checkForFailedTasks();
+      
+      // Calculate new streak based on consecutive days
+      const lastActiveDate = new Date(user.lastActive);
+      const todayDate = new Date(today);
+      
+      // Calculate the difference in days
+      const timeDiff = todayDate.getTime() - lastActiveDate.getTime();
+      const dayDiff = Math.floor(timeDiff / (1000 * 3600 * 24)); // Convert ms to days
+      
+      // Update streak based on day difference
+      let newStreakDays = user.streakDays;
+      
+      if (dayDiff === 1) {
+        // Consecutive day - increase streak
+        newStreakDays += 1;
+        console.log(`New streak: ${newStreakDays} day(s)`);
+      } else if (dayDiff > 1) {
+        // Streak broken - reset to 1
+        console.log(`Streak broken after ${newStreakDays} day(s). Resetting to 1.`);
+        newStreakDays = 1;
+      }
+      
+      // Check if we've hit any streak milestones and calculate rewards
+      const streakMilestones = checkStreakMilestones(newStreakDays, user.streakDays);
+      let streakXpReward = 0;
+      const streakMilestoneNames: string[] = [];
+      
+      streakMilestones.forEach(milestone => {
+        streakXpReward += milestone.xpReward;
+        streakMilestoneNames.push(milestone.name);
+      });
+      
+      if (streakMilestones.length > 0) {
+        console.log(`Earned ${streakXpReward} XP from streak milestones:`, streakMilestoneNames);
+      }
+      
+      // Calculate new XP from streak reward
+      const updatedXp = user.xp + streakXpReward;
+      
+      // Update user stats
+      const updatedUser = {
+        ...user,
+        streakDays: newStreakDays,
+        lastActive: today,
+        xp: updatedXp,
+        totalXp: user.totalXp + streakXpReward
+      };
+      
+      setUser(updatedUser);
+      saveUser(updatedUser);
+    }
+  }, [user.lastActive, user.streakDays, checkForFailedTasks]);
 
   return (
-    <QuestContext.Provider value={{
-      tasks,
-      user,
-      addTask,
-      completeTask,
-      undoTask,
-      deleteTask,
-      editTask,
-      copyTask,
-      isLevelUp,
-      dismissLevelUp,
-      saveTasks,
-      updateTaskHistory,
-      prevLevel,
-      newLevel,
-      levelUpData: levelUpDataRef.current,
-      forceRegenerateRecurringTasks
-    }}>
+    <QuestContext.Provider
+      value={{
+        tasks,
+        user,
+        questTypes,
+        addTask,
+        completeTask,
+        undoTask,
+        deleteTask,
+        editTask,
+        copyTask,
+        isLevelUp,
+        dismissLevelUp,
+        saveTasks,
+        updateTaskHistory,
+        prevLevel,
+        newLevel,
+        levelUpData: levelUpDataRef.current,
+        failRecurringTask,
+        checkForFailedTasks,
+        addQuestType,
+        setUser,
+        saveUser
+      }}
+    >
       {children}
     </QuestContext.Provider>
   );

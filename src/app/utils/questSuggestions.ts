@@ -1,6 +1,7 @@
 import { TaskDifficulty } from '../types';
 
-export type QuestCategory = 'recurring' | 'health' | 'productivity' | 'personal' | 'home' | 'tech' | 'social';
+// Change from union type to string type for better compatibility with questType
+export type QuestCategory = string;
 
 export interface QuestSuggestion {
   title: string;
@@ -998,248 +999,248 @@ const recurringTasks: QuestSuggestion[] = [
     title: 'Brush Teeth (Morning)',
     description: 'Brush your teeth for at least 2 minutes in the morning.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Brush Teeth (Night)',
     description: 'Brush your teeth for at least 2 minutes before bed.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Make Your Bed',
     description: 'Take a minute to make your bed after waking up.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'home'
   },
   {
     title: 'Take Out Trash',
     description: 'Empty and take out the trash/recycling.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'home'
   },
   {
     title: 'Wash Dishes',
     description: 'Clean all dirty dishes or load/unload the dishwasher.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'home'
   },
   {
     title: 'Feed Pet',
     description: 'Feed your pet(s) their regular meals.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'home'
   },
   {
     title: 'Water Plants',
     description: 'Check and water your houseplants as needed.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'home'
   },
   {
     title: 'Take Medication',
     description: 'Take your daily medications/vitamins on schedule.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Floss Teeth',
     description: 'Floss your teeth thoroughly before bed.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Wipe Kitchen Counters',
     description: 'Clean kitchen surfaces after cooking/eating.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'home'
   },
   {
     title: 'Check Mail',
     description: 'Check and sort through your mail/packages.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'home'
   },
   {
     title: 'Charge Devices',
     description: 'Plug in your phone and other devices before bed.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'tech'
   },
   {
     title: 'Pack Lunch',
     description: 'Prepare and pack your lunch for tomorrow.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Set Out Clothes',
     description: 'Choose and set out your outfit for tomorrow.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'productivity'
   },
   {
     title: 'Quick Tidy-Up',
     description: 'Spend 10 minutes picking up and putting things away.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'home'
   },
   // New recurring tasks
   {
     title: 'Leave Work On Time',
     description: 'Leave work at your scheduled end time without staying late.',
     difficulty: 'medium',
-    category: 'recurring'
+    category: 'productivity'
   },
   {
     title: 'Make Dinner',
     description: 'Prepare a home-cooked meal instead of ordering takeout.',
     difficulty: 'medium',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Daily Walk',
     description: 'Take a 15-30 minute walk during the day.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Stretch Break',
     description: 'Take a 5-minute stretch break every few hours.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Drink Water',
     description: 'Drink at least 8 glasses of water throughout the day.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Go for a Drive',
     description: 'Take a short drive to clear your mind or enjoy scenery.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'personal'
   },
   {
     title: 'Take Stairs',
     description: 'Use stairs instead of elevators throughout the day.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Meal Planning',
     description: 'Plan your meals for the next few days.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Evening Reflection',
     description: 'Spend 5 minutes reflecting on your day before bed.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'personal'
   },
   {
     title: 'Morning Routine',
     description: 'Complete your morning routine without rushing.',
     difficulty: 'medium',
-    category: 'recurring'
+    category: 'productivity'
   },
   {
     title: 'Lunch Break',
     description: 'Take a proper lunch break away from your desk.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Screen Time Limit',
     description: 'Limit recreational screen time to a set amount today.',
     difficulty: 'medium',
-    category: 'recurring'
+    category: 'personal'
   },
   {
     title: 'Grocery Shopping',
     description: 'Pick up groceries for the week.',
     difficulty: 'medium',
-    category: 'recurring'
+    category: 'home'
   },
   {
     title: 'Weekend Planning',
     description: 'Plan activities for the upcoming weekend.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'productivity'
   },
   {
     title: 'Laundry',
     description: 'Do a load of laundry and put clothes away.',
     difficulty: 'medium',
-    category: 'recurring'
+    category: 'home'
   },
   {
     title: 'Quick Workout',
     description: 'Complete a 10-15 minute workout or exercise routine.',
     difficulty: 'medium',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Vacuum',
     description: 'Vacuum one room or area of your home.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'home'
   },
   {
     title: 'Hiking',
     description: 'Go for a short hike on a local trail.',
     difficulty: 'medium',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Bike Ride',
     description: 'Take a bike ride around your neighborhood or a local trail.',
     difficulty: 'medium',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Call a Friend/Family',
     description: 'Call or video chat with a friend or family member.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'social'
   },
   {
     title: 'Read for Pleasure',
     description: 'Read a book or article for at least 15 minutes.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'personal'
   },
   {
     title: 'Mindfulness Practice',
     description: 'Practice mindfulness or meditation for 5-10 minutes.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'personal'
   },
   {
     title: 'Prepare Coffee/Tea',
     description: 'Make yourself a nice cup of coffee or tea to enjoy.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'personal'
   },
   {
     title: 'Shower/Bath',
     description: 'Take a refreshing shower or relaxing bath.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Skincare Routine',
     description: 'Complete your morning or evening skincare routine.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'health'
   },
   {
     title: 'Commute Planning',
     description: 'Plan your commute to avoid traffic or delays.',
     difficulty: 'easy',
-    category: 'recurring'
+    category: 'productivity'
   }
 ];
 

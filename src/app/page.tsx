@@ -10,10 +10,12 @@ import XPChart from './components/XPChart';
 import ActivityHeatmap from './components/ActivityHeatmap';
 import TaskDifficultyChart from './components/TaskDifficultyChart';
 import CompletionTimeChart from './components/CompletionTimeChart';
-import FailedQuests from './components/UncompletedRecurringTasks';
+import FailedQuests from './components/FailedTasks';
 import QuestSuggestionModal from './components/QuestSuggestionModal';
 import ResetDataButton from './components/ResetDataButton';
+import SaveLoadButtons from './components/SaveLoadButtons';
 import { PlusIcon, SparklesIcon } from '@heroicons/react/24/outline';
+
 
 export default function Home() {
   const [showForm, setShowForm] = useState(false);
@@ -30,16 +32,23 @@ export default function Home() {
     setEditingTask(null);
   };
   
-  const handleSelectQuest = (title: string, description: string, difficulty: TaskDifficulty) => {
-    setEditingTask({
+  const handleSelectQuest = (title: string, description: string, difficulty: TaskDifficulty, questType?: string) => {
+    console.log("Selected quest with category/type:", questType);
+    
+    // Make sure quest type is included and correctly set
+    const newTask: Task = {
       id: '', // This will be generated when the task is added
       title,
       description,
       difficulty,
       completed: false,
       createdAt: new Date().toISOString(),
-      xpReward: 0 // This will be calculated when the task is added
-    });
+      xpReward: 0, // This will be calculated when the task is added
+      questType: questType || undefined // Ensure questType is correctly assigned
+    };
+    
+    console.log("Created editingTask with questType:", newTask.questType);
+    setEditingTask(newTask);
     setShowForm(true);
   };
   
@@ -63,6 +72,7 @@ export default function Home() {
             <h2 className="text-xl font-mono border-b border-gray-700 pb-2">Active Quests</h2>
             {!showForm && (
               <div className="flex space-x-2">
+                <SaveLoadButtons />
                 <button
                   onClick={() => setShowSuggestionModal(true)}
                   className="flex items-center px-4 py-2 bg-blue-700 rounded-md font-mono hover:bg-blue-600 transition-colors"

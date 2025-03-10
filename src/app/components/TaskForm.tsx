@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Task, TaskDifficulty, DayOfWeek } from '../types';
 import { useQuest } from '../context/QuestContext';
 import { XP_REWARDS } from '../utils/levelUtils';
+import QuestTypeManager from './QuestTypeManager';
 
 interface TaskFormProps {
   editingTask: Task | null;
@@ -11,24 +12,27 @@ interface TaskFormProps {
 }
 
 export default function TaskForm({ editingTask, onCancel }: TaskFormProps) {
-  const { addTask, editTask } = useQuest();
+  const { addTask, editTask, questTypes, addQuestType} = useQuest();
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [difficulty, setDifficulty] = useState<TaskDifficulty>('medium');
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringDays, setRecurringDays] = useState<DayOfWeek[]>([]);
+  const [selectedQuestType, setSelectedQuestType] = useState<string | undefined>(undefined);
   
   const daysOfWeek: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
   
   // If editing a task, populate the form with its values
   useEffect(() => {
     if (editingTask) {
+      console.log("Editing task with questType:", editingTask.questType);
       setTitle(editingTask.title);
       setDescription(editingTask.description || '');
       setDifficulty(editingTask.difficulty);
       setIsRecurring(editingTask.isRecurring || false);
       setRecurringDays(editingTask.recurringDays || []);
+      setSelectedQuestType(editingTask.questType);
     }
   }, [editingTask]);
   
@@ -38,6 +42,8 @@ export default function TaskForm({ editingTask, onCancel }: TaskFormProps) {
     if (!title.trim()) return;
     if (isRecurring && recurringDays.length === 0) return;
     
+    console.log("Submitting form with questType:", selectedQuestType);
+    
     if (editingTask && editingTask.id) {
       editTask(
         editingTask.id, 
@@ -45,7 +51,8 @@ export default function TaskForm({ editingTask, onCancel }: TaskFormProps) {
         description, 
         difficulty, 
         isRecurring, 
-        isRecurring ? recurringDays : undefined
+        isRecurring ? recurringDays : undefined,
+        selectedQuestType
       );
     } else {
       addTask(
@@ -53,7 +60,8 @@ export default function TaskForm({ editingTask, onCancel }: TaskFormProps) {
         description, 
         difficulty, 
         isRecurring, 
-        isRecurring ? recurringDays : undefined
+        isRecurring ? recurringDays : undefined,
+        selectedQuestType
       );
     }
     
@@ -63,6 +71,7 @@ export default function TaskForm({ editingTask, onCancel }: TaskFormProps) {
     setDifficulty('medium');
     setIsRecurring(false);
     setRecurringDays([]);
+    setSelectedQuestType(undefined);
     onCancel();
   };
   
@@ -109,6 +118,32 @@ export default function TaskForm({ editingTask, onCancel }: TaskFormProps) {
           className="w-full p-2 bg-gray-900 border border-gray-700 rounded-md font-mono focus:outline-none focus:ring-2 focus:ring-purple-600 min-h-[80px]"
           placeholder="Enter quest description (optional)"
         />
+      </div>
+      
+      {/* Quest Type Manager */}
+      <QuestTypeManager 
+        questTypes={questTypes} 
+        onAddQuestType={addQuestType} 
+      />
+      
+      {/* Quest Type Selector */}
+      <div className="mb-4">
+        <label htmlFor="questType" className="block text-sm font-mono mb-2">
+          Quest Type
+        </label>
+        <select
+          id="questType"
+          value={selectedQuestType || ''}
+          onChange={(e) => setSelectedQuestType(e.target.value || undefined)}
+          className="w-full p-2 bg-gray-900 border border-gray-700 rounded-md font-mono focus:outline-none focus:ring-2 focus:ring-purple-600"
+        >
+          <option value="">No specific type</option>
+          {questTypes.map((type) => (
+            <option key={type} value={type}>
+              {type.toUpperCase()}
+            </option>
+          ))}
+        </select>
       </div>
       
       <div className="mb-4">

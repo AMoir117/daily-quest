@@ -49,6 +49,7 @@ export default function CompletionTimeChart() {
   const [hourlyData, setHourlyData] = useState<number[]>(Array(24).fill(0));
   const [productiveRange, setProductiveRange] = useState<{start: number, end: number} | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [averageCompletionTimes, setAverageCompletionTimes] = useState<number[]>(Array(24).fill(0));
 
   useEffect(() => {
     setIsClient(true);
@@ -58,48 +59,87 @@ export default function CompletionTimeChart() {
     // Skip if SSR (server-side rendering)
     if (typeof window === 'undefined') return;
     
-    // Process task data to extract completion times
-    const getCompletionTimeDistribution = (tasks: Task[]) => {
-      // Initialize an array with 24 zeros (one for each hour)
+    // Process task data to extract completion times and durations
+    const analyzeTaskProductivity = (tasks: Task[]) => {
+      // Initialize arrays for our data
       const hourlyDistribution = Array(24).fill(0);
+      const hourlyCompletionTimes: number[][] = Array(24).fill(0).map(() => []);
+      const hourlyAverageCompletionTimes = Array(24).fill(0);
       
-      // Count completions by hour
-      tasks.forEach(task => {
-        if (task.completed && task.completedAt) {
-          try {
-            const completionDate = new Date(task.completedAt);
-            const hour = completionDate.getHours();
-            if (!isNaN(hour) && hour >= 0 && hour < 24) {
-              hourlyDistribution[hour]++;
-            }
-          } catch (error) {
-            console.error('Error parsing date:', error);
+      // Analyze completed tasks - only filter by completed status
+      const completedTasks = tasks.filter(task => task.completed && task.completedAt);
+      
+      completedTasks.forEach(task => {
+        try {
+          // For the chart, we only need the completion hour
+          const completionDate = new Date(task.completedAt!);
+          
+          // Skip invalid dates
+          if (isNaN(completionDate.getTime())) {
+            console.warn('Invalid completion date for task:', task.id, task.title);
+            return;
           }
+          
+          const completionHour = completionDate.getHours();
+          
+          if (completionHour >= 0 && completionHour < 24) {
+            // Count the completion in this hour
+            hourlyDistribution[completionHour]++;
+            
+            // If we have a valid creation date, calculate completion time
+            if (task.createdAt) {
+              const creationDate = new Date(task.createdAt);
+              
+              if (!isNaN(creationDate.getTime())) {
+                // Calculate time to complete in minutes (use absolute value to handle timestamp issues)
+                const timeToComplete = Math.abs(completionDate.getTime() - creationDate.getTime()) / (1000 * 60);
+                
+                // Skip unreasonably long times (more than 7 days)
+                if (timeToComplete <= 10080) {
+                  hourlyCompletionTimes[completionHour].push(timeToComplete);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error analyzing task:', error);
         }
       });
       
-      // Find the maximum value for scaling (not used but kept for future reference)
-      const max = Math.max(...hourlyDistribution);
+      // Calculate average completion time for each hour
+      for (let i = 0; i < 24; i++) {
+        if (hourlyCompletionTimes[i].length > 0) {
+          const sum = hourlyCompletionTimes[i].reduce((acc, time) => acc + time, 0);
+          hourlyAverageCompletionTimes[i] = sum / hourlyCompletionTimes[i].length;
+        }
+      }
       
-      // Find the most productive 3-hour range
-      let maxSum = 0;
+      // Find the most productive 3-hour range based on number of tasks completed
+      // Since we have timestamp issues, we'll use a simpler metric for now
+      let maxTasks = 0;
       let startHour = 0;
       
       // Check each possible 3-hour window
       for (let i = 0; i < 24; i++) {
-        // Calculate sum for a 3-hour window (wrapping around if needed)
-        const sum = hourlyDistribution[i] + 
-                   hourlyDistribution[(i + 1) % 24] + 
-                   hourlyDistribution[(i + 2) % 24];
+        const hours = [i, (i + 1) % 24, (i + 2) % 24];
         
-        if (sum > maxSum) {
-          maxSum = sum;
+        // Calculate total tasks in this window
+        let windowTasks = 0;
+        hours.forEach(hour => {
+          windowTasks += hourlyDistribution[hour];
+        });
+        
+        // Skip windows with no completed tasks
+        if (windowTasks === 0) continue;
+        
+        if (windowTasks > maxTasks) {
+          maxTasks = windowTasks;
           startHour = i;
         }
       }
       
       // Only set a productive range if we have some data
-      const productiveRange = maxSum > 0 
+      const productiveRange = maxTasks > 0 
         ? { 
             start: startHour, 
             end: (startHour + 2) % 24 
@@ -108,13 +148,14 @@ export default function CompletionTimeChart() {
       
       return {
         hourlyDistribution,
-        max,
+        hourlyAverageCompletionTimes,
         productiveRange
       };
     };
 
-    const { hourlyDistribution, productiveRange } = getCompletionTimeDistribution(tasks);
+    const { hourlyDistribution, hourlyAverageCompletionTimes, productiveRange } = analyzeTaskProductivity(tasks);
     setHourlyData(hourlyDistribution);
+    setAverageCompletionTimes(hourlyAverageCompletionTimes);
     setProductiveRange(productiveRange);
   }, [tasks]);
 
@@ -281,6 +322,51 @@ export default function CompletionTimeChart() {
     return sum;
   };
 
+  // Get average completion time for the productive range (in minutes)
+  const getAverageCompletionTime = () => {
+    if (!productiveRange) return 0;
+    
+    const { start, end } = productiveRange;
+    let totalTasks = 0;
+    let totalTime = 0;
+    
+    const processHour = (hour: number) => {
+      const tasks = hourlyData[hour];
+      if (tasks > 0) {
+        totalTasks += tasks;
+        totalTime += averageCompletionTimes[hour] * tasks;
+      }
+    };
+    
+    if (start <= end) {
+      // Normal range (e.g., 9 AM to 11 AM)
+      for (let i = start; i <= end; i++) {
+        processHour(i);
+      }
+    } else {
+      // Range wraps around midnight (e.g., 10 PM to 1 AM)
+      for (let i = start; i < 24; i++) {
+        processHour(i);
+      }
+      for (let i = 0; i <= end; i++) {
+        processHour(i);
+      }
+    }
+    
+    if (totalTasks === 0) return 0;
+    return Math.round(totalTime / totalTasks);
+  };
+
+  // Format minutes into a readable duration
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) {
+      return `${Math.round(minutes)} min`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    return `${hours}h ${mins}m`;
+  };
+
   return (
     <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
       <h2 className="text-xl font-mono mb-4">Productive Hours</h2>
@@ -296,6 +382,9 @@ export default function CompletionTimeChart() {
           </p>
           <p className="text-sm text-gray-400 font-mono">
             Tasks completed: <span className="text-purple-400 font-bold">{getProductiveRangeTasks()}</span>
+            {getAverageCompletionTime() > 0 && (
+              <> • Avg. completion time: <span className="text-purple-400 font-bold">{formatDuration(getAverageCompletionTime())}</span></>
+            )}
           </p>
         </div>
       )}
