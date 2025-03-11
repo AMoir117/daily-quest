@@ -1,5 +1,6 @@
 export type TaskDifficulty = 'easy' | 'medium' | 'hard';
 export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+export type QuestStatus = 'active' | 'hidden' | 'completed';
 
 export interface Task {
   id: string;
@@ -14,6 +15,7 @@ export interface Task {
   recurringDays?: DayOfWeek[];
   parentTaskId?: string; // For tasks generated from recurring tasks
   questType?: string; // Custom quest type for categorization
+  questStatus?: QuestStatus; // Status of the quest (active, hidden, etc.)
 }
 
 export interface User {

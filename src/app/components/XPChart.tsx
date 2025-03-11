@@ -13,7 +13,7 @@ import {
   BarElement,
   Filler,
 } from 'chart.js';
-import { Line, Bar } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import { getStats, getLocalDateString } from '../utils/storageUtils';
 import { DailyStats } from '../types';
 import { useQuest } from '../context/QuestContext';
@@ -118,55 +118,7 @@ const lineOptions = {
   }
 };
 
-const barOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  elements: {
-    line: {
-      tension: 0 // Disables bezier curves, uses straight lines
-    },
-    point: {
-      radius: 4,
-      hitRadius: 10
-    }
-  },
-  plugins: {
-    legend: {
-      position: 'top' as const,
-      labels: {
-        font: {
-          family: 'monospace'
-        }
-      }
-    },
-    title: {
-      display: true,
-      text: 'Quests Completed Per Day',
-      font: {
-        family: 'monospace',
-        size: 16
-      }
-    }
-  },
-  scales: {
-    x: {
-      ticks: {
-        font: {
-          family: 'monospace'
-        }
-      }
-    },
-    y: {
-      beginAtZero: true,
-      ticks: {
-        font: {
-          family: 'monospace'
-        },
-        precision: 0 // Only show whole numbers for quest counts
-      }
-    }
-  }
-};
+
 
 // XP Velocity Chart options
 const velocityOptions = {
@@ -286,13 +238,13 @@ export default function XPChart() {
     setVelocityData(velocityPoints);
   };
   
-  // Format date for display (e.g., "Mar 15")
+  // Format date for display (e.g., "Mon, Mar 15")
   const formatDate = (dateString: string) => {
     // Handle date strings in YYYY-MM-DD format to prevent timezone issues
     // By appending 'T12:00:00' we set it to noon to avoid any date shifting
     const fullDateString = `${dateString}T12:00:00`;
     const date = new Date(fullDateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
   
   // Prepare data for charts
@@ -326,123 +278,6 @@ export default function XPChart() {
     ]
   };
   
-  // Modified to include cumulative quests
-  const questsData = {
-    labels: stats.map(stat => formatDate(stat.date)),
-    datasets: [
-      {
-        label: 'Cumulative Quests',
-        data: stats.reduce((acc: number[], stat, index) => {
-          // Calculate cumulative sum
-          const previousTotal = index > 0 ? acc[index - 1] : 0;
-          acc.push(previousTotal + stat.tasksCompleted);
-          return acc;
-        }, []),
-        borderColor: 'rgb(147, 51, 234)',
-        backgroundColor: 'rgba(147, 51, 234, 0.5)',
-        tension: 0,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        fill: false,
-        yAxisID: 'y'
-      },
-      {
-        label: 'Daily Quests',
-        data: stats.map(stat => stat.tasksCompleted),
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.5)',
-        tension: 0,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        fill: false,
-        yAxisID: 'y1',
-        borderDash: [5, 5]
-      }
-    ]
-  };
-  
-  // Update quests chart options to include dual Y axes
-  const questsOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    elements: {
-      line: {
-        tension: 0 // Disables bezier curves, uses straight lines
-      },
-      point: {
-        radius: 4,
-        hitRadius: 10
-      }
-    },
-    plugins: {
-      legend: {
-        position: 'top' as const,
-        labels: {
-          font: {
-            family: 'monospace'
-          }
-        }
-      },
-      title: {
-        display: true,
-        text: 'Quests Completed Over Time',
-        font: {
-          family: 'monospace',
-          size: 16
-        }
-      }
-    },
-    scales: {
-      x: {
-        ticks: {
-          font: {
-            family: 'monospace'
-          }
-        }
-      },
-      y: {
-        type: 'linear' as const,
-        display: true,
-        position: 'left' as const,
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Cumulative Quests',
-          font: {
-            family: 'monospace'
-          }
-        },
-        ticks: {
-          font: {
-            family: 'monospace'
-          },
-          precision: 0
-        }
-      },
-      y1: {
-        type: 'linear' as const,
-        display: true,
-        position: 'right' as const,
-        beginAtZero: true,
-        grid: {
-          drawOnChartArea: false,
-        },
-        title: {
-          display: true,
-          text: 'Daily Quests',
-          font: {
-            family: 'monospace'
-          }
-        },
-        ticks: {
-          font: {
-            family: 'monospace'
-          },
-          precision: 0
-        }
-      }
-    }
-  };
   
   // Prepare velocity chart data
   const velocityChartData = {
@@ -504,10 +339,13 @@ export default function XPChart() {
     }
   };
   
-  if (stats.length === 0) {
+  // Check if there are any completed tasks that earned XP
+  const hasCompletedTasks = stats.some(stat => stat.xpGained > 0);
+  
+  if (!hasCompletedTasks) {
     return (
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 h-40 flex items-center justify-center">
-        <p className="text-gray-400 font-mono">Complete quests to see your progress over time!</p>
+        <p className="text-gray-400 font-mono">Complete quests to see your XP progress over time!</p>
       </div>
     );
   }

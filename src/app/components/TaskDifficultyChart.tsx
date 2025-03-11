@@ -240,7 +240,10 @@ export default function TaskDifficultyChart() {
     );
   }
   
-  if (tasks.filter(task => !task.isRecurring || task.parentTaskId).length === 0 && chartData.failedCounts.every(count => count === 0)) {
+  // Check if there are any completed tasks
+  const hasCompletedTasks = chartData.completedCounts.some(count => count > 0);
+  
+  if (!hasCompletedTasks) {
     return (
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 h-40 flex items-center justify-center mb-6">
         <p className="text-gray-400 font-mono">Complete quests to see difficulty distribution!</p>

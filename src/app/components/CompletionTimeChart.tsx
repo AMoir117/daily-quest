@@ -69,6 +69,8 @@ export default function CompletionTimeChart() {
       // Analyze completed tasks - only filter by completed status
       const completedTasks = tasks.filter(task => task.completed && task.completedAt);
       
+      console.log(`Analyzing ${completedTasks.length} completed tasks for productivity patterns`);
+      
       completedTasks.forEach(task => {
         try {
           // For the chart, we only need the completion hour
@@ -81,6 +83,7 @@ export default function CompletionTimeChart() {
           }
           
           const completionHour = completionDate.getHours();
+          console.log(`Task "${task.title}" completed at hour ${completionHour}`);
           
           if (completionHour >= 0 && completionHour < 24) {
             // Count the completion in this hour
@@ -91,12 +94,31 @@ export default function CompletionTimeChart() {
               const creationDate = new Date(task.createdAt);
               
               if (!isNaN(creationDate.getTime())) {
-                // Calculate time to complete in minutes (use absolute value to handle timestamp issues)
-                const timeToComplete = Math.abs(completionDate.getTime() - creationDate.getTime()) / (1000 * 60);
+                // Handle recurring tasks which have 12:01 AM creation time
+                let timeToComplete: number;
                 
-                // Skip unreasonably long times (more than 7 days)
-                if (timeToComplete <= 10080) {
+                // If it's a recurring task instance (has parentTaskId) and was created at the beginning of the day
+                const isRecurringInstance = !!task.parentTaskId && creationDate.getHours() === 0 && creationDate.getMinutes() <= 1;
+                
+                if (isRecurringInstance) {
+                  // For recurring tasks, use the time since the start of the same day
+                  // This avoids showing unrealistically long completion times
+                  const sameDayMidnight = new Date(completionDate);
+                  sameDayMidnight.setHours(0, 0, 0, 0);
+                  timeToComplete = (completionDate.getTime() - sameDayMidnight.getTime()) / (1000 * 60);
+                } else {
+                  // For regular tasks, calculate actual time between creation and completion
+                  timeToComplete = Math.max(0, (completionDate.getTime() - creationDate.getTime()) / (1000 * 60));
+                }
+                
+                // Skip unreasonably long times (more than 24 hours for most tasks)
+                // But allow up to 7 days for non-recurring tasks
+                const maxTime = isRecurringInstance ? 1440 : 10080; // 24 hours or 7 days
+                if (timeToComplete <= maxTime) {
+                  console.log(`Task completion time: ${timeToComplete.toFixed(0)} minutes`);
                   hourlyCompletionTimes[completionHour].push(timeToComplete);
+                } else {
+                  console.log(`Skipping unusually long completion time: ${timeToComplete.toFixed(0)} minutes`);
                 }
               }
             }
@@ -115,41 +137,37 @@ export default function CompletionTimeChart() {
       }
       
       // Find the most productive 3-hour range based on number of tasks completed
-      // Since we have timestamp issues, we'll use a simpler metric for now
       let maxTasks = 0;
       let startHour = 0;
+      let endHour = 0;
       
       // Check each possible 3-hour window
       for (let i = 0; i < 24; i++) {
-        const hours = [i, (i + 1) % 24, (i + 2) % 24];
-        
-        // Calculate total tasks in this window
+        // Calculate tasks in current 3-hour window (handling wrap-around midnight)
         let windowTasks = 0;
-        hours.forEach(hour => {
+        for (let j = 0; j < 3; j++) {
+          const hour = (i + j) % 24; // Wrap around midnight if needed
           windowTasks += hourlyDistribution[hour];
-        });
-        
-        // Skip windows with no completed tasks
-        if (windowTasks === 0) continue;
+        }
         
         if (windowTasks > maxTasks) {
           maxTasks = windowTasks;
           startHour = i;
+          endHour = (i + 2) % 24; // End hour is inclusive (so 2 hours after start)
         }
       }
       
-      // Only set a productive range if we have some data
-      const productiveRange = maxTasks > 0 
-        ? { 
-            start: startHour, 
-            end: (startHour + 2) % 24 
-          } 
-        : null;
+      // More detailed logs about most productive time
+      console.log(`Most productive time: ${formatHour(startHour)} to ${formatHour(endHour)}`);
+      console.log(`Tasks completed during this time: ${maxTasks}`);
       
       return {
         hourlyDistribution,
         hourlyAverageCompletionTimes,
-        productiveRange
+        productiveRange: {
+          start: startHour,
+          end: endHour
+        }
       };
     };
 
@@ -390,4 +408,4 @@ export default function CompletionTimeChart() {
       )}
     </div>
   );
-} 
+}

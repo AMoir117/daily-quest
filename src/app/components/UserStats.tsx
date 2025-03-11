@@ -507,16 +507,14 @@ export default function UserStats() {
           <div className="text-xs font-mono text-gray-400">Next: {stat.xpStats.xpToNextLevel} XP</div>
         </div>
         
-        {/* Failed quests summary */}
-        {stat.xpStats.failedTasks > 0 && (
-          <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-700">
-            <div className="text-xs font-mono text-amber-400 flex items-center">
-              <ExclamationTriangleIcon className="w-3 h-3 mr-1" />
-              Failed: {stat.xpStats.failedTasks}
-            </div>
-            <div className="text-xs font-mono text-amber-400">-{stat.xpStats.failedXp} XP</div>
+        {/* Failed quests summary - always display */}
+        <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-700">
+          <div className="text-xs font-mono text-amber-400 flex items-center">
+            <ExclamationTriangleIcon className="w-3 h-3 mr-1" />
+            Failed: {stat.xpStats.failedTasks}
           </div>
-        )}
+          <div className="text-xs font-mono text-amber-400">-{stat.xpStats.failedXp} XP</div>
+        </div>
       </div>
     );
   };

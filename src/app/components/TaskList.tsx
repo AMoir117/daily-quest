@@ -2,10 +2,17 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircleIcon, TrashIcon, PencilIcon, ArrowUturnLeftIcon, ClipboardDocumentIcon, CalendarIcon, ArrowPathIcon, PlusIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, TrashIcon, PencilIcon, ArrowUturnLeftIcon, ClipboardDocumentIcon, CalendarIcon, ArrowPathIcon, ExclamationCircleIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useQuest } from '../context/QuestContext';
 import { Task, DayOfWeek } from '../types';
-import { getDayOfWeek, getLocalDateString } from '../utils/storageUtils';
+import { 
+  getDayOfWeek, 
+  getLocalDateString,
+  getDayStartDateString,
+  getLocalISOString,
+  getTasks,
+  saveTasks as saveTasksUtil
+} from '../utils/storageUtils';
 import { v4 as uuidv4 } from 'uuid';
 import DeleteTaskModal from './DeleteTaskModal';
 
@@ -17,7 +24,7 @@ interface TaskItemProps {
 }
 
 function TaskItem({ task, onEdit, onUndo, onCopy }: TaskItemProps) {
-  const { completeTask, deleteTask} = useQuest();
+  const { completeTask, deleteTask, hideTask, unhideTask } = useQuest();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   
 
@@ -49,6 +56,7 @@ function TaskItem({ task, onEdit, onUndo, onCopy }: TaskItemProps) {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
+      weekday: 'short',
       month: 'short', 
       day: 'numeric',
       year: 'numeric'
@@ -149,6 +157,15 @@ function TaskItem({ task, onEdit, onUndo, onCopy }: TaskItemProps) {
     return questTypeColors[category] || 'bg-gray-700/50 text-gray-300';
   };
   
+  // Add new handlers for hiding/showing
+  const handleHide = () => {
+    hideTask(task.id);
+  };
+  
+  const handleUnhide = () => {
+    unhideTask(task.id);
+  };
+  
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
@@ -204,12 +221,10 @@ function TaskItem({ task, onEdit, onUndo, onCopy }: TaskItemProps) {
             <span className="ml-2 text-purple-400">
               {isFailedTask ? `-${task.xpReward} XP` : `+${task.xpReward} XP`}
             </span>
-            {!isDailyInstance && !isRecurringTemplate && (
-              <span className="ml-2 text-gray-400 flex items-center">
-                <CalendarIcon className="w-3 h-3 mr-1" />
-                {displayDate}
-              </span>
-            )}
+            <span className="ml-2 text-gray-400 flex items-center">
+              <CalendarIcon className="w-3 h-3 mr-1" />
+              {displayDate}
+            </span>
             {/* Display quest type if available */}
             {task.questType && task.questType !== "No Type" && (
               <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${getCategoryClass()}`}>
@@ -226,14 +241,14 @@ function TaskItem({ task, onEdit, onUndo, onCopy }: TaskItemProps) {
               {/* Edit button */}
               <button
                 onClick={() => onEdit(task)}
-                className="p-2 rounded-full hover:bg-gray-700 transition-colors"
-                aria-label="Edit task"
+                className="p-1 rounded-full hover:bg-gray-700 text-gray-400"
+                title="Edit task"
               >
-                <PencilIcon className="w-5 h-5 text-blue-400" />
+                <PencilIcon className="w-5 h-5" />
               </button>
               
-              {/* Complete button */}
-              {!isRecurringTemplate && (
+              {/* Complete button - only show if task is not hidden */}
+              {!isRecurringTemplate && task.questStatus !== 'hidden' && (
                 <button
                   onClick={handleComplete}
                   className="p-2 rounded-full hover:bg-gray-700 transition-colors"
@@ -250,10 +265,10 @@ function TaskItem({ task, onEdit, onUndo, onCopy }: TaskItemProps) {
           {(!isFailedTask || task.title.startsWith('FAILED:')) && (
             <button
               onClick={handleDelete}
-              className="p-2 rounded-full hover:bg-gray-700 transition-colors"
-              aria-label="Delete task"
+              className="p-1 rounded-full hover:bg-gray-700 text-red-500"
+              title="Delete task"
             >
-              <TrashIcon className="w-5 h-5 text-red-400" />
+              <TrashIcon className="w-5 h-5" />
             </button>
           )}
           
@@ -276,6 +291,27 @@ function TaskItem({ task, onEdit, onUndo, onCopy }: TaskItemProps) {
               </button>
             </>
           )}
+          
+          {/* Add hide/unhide buttons */}
+          {task.questStatus !== 'hidden' && (
+            <button
+              onClick={handleHide}
+              className="p-1 rounded-full hover:bg-gray-700 text-gray-400"
+              title="Hide task"
+            >
+              <EyeSlashIcon className="w-5 h-5" />
+            </button>
+          )}
+          
+          {task.questStatus === 'hidden' && (
+            <button
+              onClick={handleUnhide}
+              className="p-1 rounded-full hover:bg-gray-700 text-blue-500"
+              title="Unhide task"
+            >
+              <EyeIcon className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
       
@@ -293,20 +329,31 @@ interface TaskListProps {
   onEditTask: (task: Task) => void;
   showActive?: boolean;
   showCompleted?: boolean;
+  showHidden?: boolean;
+  showRecurringTemplates?: boolean;
 }
 
 export default function TaskList({ 
   onEditTask, 
   showActive = true, 
-  showCompleted = true 
+  showHidden = false,
+  showRecurringTemplates = false
 }: TaskListProps) {
-  const { tasks, undoTask, copyTask, questTypes } = useQuest();
-  const [showRecurringTemplates, setShowRecurringTemplates] = useState(false);
+  const { tasks, questTypes } = useQuest();
   
-  // This ensures we're strictly filtering active vs completed tasks
-  // It should be impossible for a task to be in both lists
-  const activeTasks = tasks.filter(task => task.completed === false);
-  const completedTasks = tasks.filter(task => task.completed === true);
+  // Use showHidden prop directly
+  const showHiddenTasks = showHidden;
+  
+  // Filter tasks by status and hidden state
+  const activeTasks = tasks.filter(task => {
+    return task.completed === false && 
+           (showHiddenTasks || task.questStatus !== 'hidden');
+  });
+  
+  const completedTasks = tasks.filter(task => {
+    return task.completed === true && 
+           (showHiddenTasks || task.questStatus !== 'hidden');
+  });
   
   // Log current task counts
   console.log(`TaskList: Active tasks: ${activeTasks.length}, Completed tasks: ${completedTasks.length}`);
@@ -485,45 +532,97 @@ export default function TaskList({
     };
   }
   
-  if (tasks.length === 0) {
+  // Simplify the rendering logic by removing conditional returns for completed tasks
+  if (activeTasks.length === 0 && showActive) {
+    // Check if ANY tasks exist in the system before showing onboarding message
+    const anyTasksExist = tasks.length > 0;
+    const hasCompletedTasks = tasks.some(task => task.completed);
+    const hasTemplates = tasks.some(task => task.isRecurring && !task.completed);
+    
+    if (!anyTasksExist) {
+      return (
+        <div className="space-y-6">
+          <div className="text-center py-8 font-mono">
+            <h3 className="text-lg text-purple-400 mb-2">Welcome to DailyQuest</h3>
+            <p className="text-gray-400 max-w-md mx-auto">
+              Track your daily tasks, earn XP, and level up as you complete quests. Create one-time or recurring quests to boost your productivity!
+            </p>
+          </div>
+        </div>
+      );
+    }
+    
     return (
-      <div className="text-center py-8 font-mono">
-        <p className="text-gray-400">No quests available. Add your first quest!</p>
+      <div className="space-y-6">
+        {/* No active quests message - but there are completed tasks or templates */}
+        <div className="text-center py-4 font-mono bg-gray-800 rounded-lg border border-gray-700 px-4">
+          <p className="text-gray-300 mb-2">
+            No active quests found.
+          </p>
+          {hasCompletedTasks && (
+            <p className="text-gray-400">
+              You have completed quests! Check the{' '}
+              <button 
+                onClick={() => {
+                  const section = document.getElementById('completed-quests-section');
+                  if (section) section.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="text-purple-400 hover:text-purple-300 underline focus:outline-none"
+              >
+                completed quests section.
+              </button>{' '}
+            </p>
+          )}
+          {hasTemplates && (
+            <p className="text-gray-400 mt-2">
+              You have recurring quest templates. Add new quests from your templates to start tracking your progress.
+            </p>
+          )}
+          {!hasCompletedTasks && !hasTemplates && (
+            <p className="text-gray-400">
+              Create a new quest to start tracking your progress.
+            </p>
+          )}
+        </div>
+
+        {/* Always show the completed section if showCompleted is true */}
+        
       </div>
     );
   }
   
-  if (!showActive && !showCompleted) {
+  
+  if (showActive && activeTasks.length === 0) {
     return (
-      <div className="text-center py-8 font-mono">
-        <p className="text-gray-400">No tasks to display based on current filters.</p>
+      <div className="space-y-6">
+        {/* Message for no active tasks */}
+        <div className="text-center py-4 font-mono">
+          <p className="text-gray-400">
+            No active quests. Add a new quest or check{' '}
+            <button 
+              onClick={() => {
+                const section = document.getElementById('completed-quests-section');
+                if (section) section.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="text-purple-400 hover:text-purple-300 underline focus:outline-none"
+            >
+              completed quests
+            </button>.
+          </p>
+        </div>
       </div>
     );
   }
   
-  if (showActive && activeTasks.length === 0 && !showCompleted) {
+  if (completedTasks.length === 0 && !showActive) {
     return (
-      <div className="text-center py-8 font-mono">
-        <p className="text-gray-400">
-          No active quests. Add a new quest or check{' '}
-          <button 
-            onClick={() => {
-              const section = document.getElementById('completed-quests-section');
-              if (section) section.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="text-purple-400 hover:text-purple-300 underline focus:outline-none"
-          >
-            completed quests
-          </button>.
-        </p>
-      </div>
-    );
-  }
-  
-  if (showCompleted && completedTasks.length === 0 && !showActive) {
-    return (
-      <div className="text-center py-8 font-mono">
-        <p className="text-gray-400">No completed quests yet. Complete some quests to see them here!</p>
+      <div className="space-y-6">
+        <div className="text-center py-8 font-mono">
+          <h3 className="text-lg text-purple-400 mb-2">Welcome to DailyQuest</h3>
+          <p className="text-gray-400 max-w-md mx-auto">
+            Track your daily tasks, earn XP, and level up as you complete quests. Create one-time or recurring quests to boost your productivity!
+          </p>
+        </div>
       </div>
     );
   }
@@ -532,94 +631,106 @@ export default function TaskList({
     <div className="space-y-6">
       {showActive && (
         <>
-          {/* Manage Recurring Templates Section */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-mono uppercase text-gray-400 border-b border-gray-700 pb-1">
+          {/* Message for no active tasks */}
+          {activeTasks.length === 0 && (
+            <div className="text-center py-4 font-mono">
+              <p className="text-gray-400">
+                No active quests. Add a new quest or check{' '}
+                <button 
+                  onClick={() => {
+                    const section = document.getElementById('completed-quests-section');
+                    if (section) section.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="text-purple-400 hover:text-purple-300 underline focus:outline-none"
+                >
+                  completed quests
+                </button>.
+              </p>
+            </div>
+          )}
+          
+          {/* Show templates when showRecurringTemplates is true */}
+          {showRecurringTemplates && (
+            <div className="mt-2 pt-4 mb-6">
+              <h3 className="text-sm font-mono uppercase text-gray-400 mb-2 border-b border-gray-700 pb-1">
+                All Recurring Templates
+              </h3>
+              {organizedActiveTasks.recurringTemplates.length > 0 ? (
+                organizedActiveTasks.recurringTemplates.map((template: Task) => (
+                  <TaskItem key={template.id} task={template} onEdit={onEditTask} />
+                ))
+              ) : (
+                <p className="text-sm text-gray-400 font-mono py-2">
+                  No recurring templates yet. Create one by checking &quot;Make this a recurring quest&quot; when adding a new quest.
+                </p>
+              )}
+            </div>
+          )}
+          
+          {/* Recurring Quests for Today Section - Only show if there are templates */}
+          {organizedActiveTasks.recurringTemplates.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-sm font-mono uppercase text-gray-400 border-b border-gray-700 pb-1 mb-2">
                 Recurring Quests for Today
               </h3>
-              <button 
-                className="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded font-mono"
-                onClick={() => setShowRecurringTemplates(!showRecurringTemplates)}
-              >
-                {showRecurringTemplates ? 'Hide Templates' : 'Manage Templates'}
-              </button>
-            </div>
-            
-            {/* Display all recurring tasks for today */}
-            <div className="mt-2">
-              {(() => {
-                // Get all recurring templates scheduled for today
-                const templatesForToday = organizedActiveTasks.recurringTemplates
-                  .filter(template => template.recurringDays?.includes(getDayOfWeek(new Date()) as DayOfWeek));
-                
-                if (templatesForToday.length === 0) {
-                  return (
-                    <p className="text-sm text-gray-400 font-mono py-2">
-                      No recurring quests scheduled for today.
-                    </p>
-                  );
-                }
-                
-                // Group templates by category for better organization
-                const templatesByCategory: Record<string, Task[]> = {};
-                
-                // Initialize with all used categories
-                const categories = new Set<string>();
-                templatesForToday.forEach(template => {
-                  if (template.questType) {
-                    categories.add(template.questType);
-                  } else {
-                    categories.add("No Category");
+              
+              {/* Display all recurring tasks for today */}
+              <div className="mt-2">
+                {(() => {
+                  // Get all recurring templates scheduled for today
+                  const templatesForToday = organizedActiveTasks.recurringTemplates
+                    .filter(template => template.recurringDays?.includes(getDayOfWeek(new Date()) as DayOfWeek));
+                  
+                  if (templatesForToday.length === 0) {
+                    return (
+                      <p className="text-sm text-gray-400 font-mono py-2">
+                        No recurring quests scheduled for today.
+                      </p>
+                    );
                   }
-                });
-                
-                // Create empty arrays for each category
-                categories.forEach(category => {
-                  templatesByCategory[category] = [];
-                });
-                
-                // Sort templates into categories
-                templatesForToday.forEach(template => {
-                  const category = template.questType || "No Category";
-                  templatesByCategory[category].push(template);
-                });
-                
-                // Render templates by category
-                return (
-                  <div className="space-y-4">
-                    {Object.entries(templatesByCategory).map(([category, templates]) => (
-                      <div key={category} className="mb-2">
-                        <div className="space-y-2">
-                          {templates.map(template => (
-                            <RecurringInstanceItem key={template.id} template={template} />
-                          ))}
+                  
+                  // Group templates by category for better organization
+                  const templatesByCategory: Record<string, Task[]> = {};
+                  
+                  // Initialize with all used categories
+                  const categories = new Set<string>();
+                  templatesForToday.forEach(template => {
+                    if (template.questType) {
+                      categories.add(template.questType);
+                    } else {
+                      categories.add("No Category");
+                    }
+                  });
+                  
+                  // Create empty arrays for each category
+                  categories.forEach(category => {
+                    templatesByCategory[category] = [];
+                  });
+                  
+                  // Add templates to their categories
+                  templatesForToday.forEach(template => {
+                    const category = template.questType || "No Category";
+                    templatesByCategory[category].push(template);
+                  });
+                  
+                  // Render templates by category
+                  return (
+                    <div className="space-y-4">
+                      {Object.entries(templatesByCategory).map(([category, templates]) => (
+                        <div key={category} className="mb-2">
+                          <div className="space-y-2">
+                            {templates.map(template => (
+                              <RecurringInstanceItem key={template.id} template={template} />
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-            
-            {/* Show all templates when "Manage Templates" is clicked */}
-            {showRecurringTemplates && (
-              <div className="mt-6 border-t border-gray-700 pt-4">
-                <h3 className="text-sm font-mono uppercase text-gray-400 mb-2">
-                  All Recurring Templates
-                </h3>
-                {organizedActiveTasks.recurringTemplates.length > 0 ? (
-                  organizedActiveTasks.recurringTemplates.map(template => (
-                    <TaskItem key={template.id} task={template} onEdit={onEditTask} />
-                  ))
-                ) : (
-                  <p className="text-sm text-gray-400 font-mono py-2">
-                    No recurring templates yet. Create one by checking &quot;Make this a recurring quest&quot; when adding a new quest.
-                  </p>
-                )}
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
-            )}
-          </div>
+            </div>
+          )}
           
           {/* Quest type groups */}
           {questTypes.map(type => {
@@ -659,39 +770,7 @@ export default function TaskList({
               ))}
             </div>
           )}
-          
-          {/* Show message if no active tasks */}
-          {activeTasks.length === 0 && (
-            <div className="text-center py-6 text-gray-500 font-mono">
-              No active quests. Create a new quest to get started!
-            </div>
-          )}
         </>
-      )}
-    
-      
-      {/* Completed Tasks Section */}
-      {showCompleted && (
-        <div className="mb-6">
-          <h3 className="text-sm font-mono uppercase text-gray-400 mb-2 border-b border-gray-700 pb-1">
-            Completed Quests
-          </h3>
-          {completedTasks.length > 0 ? (
-            completedTasks.map(task => (
-              <TaskItem 
-                key={task.id} 
-                task={task} 
-                onEdit={onEditTask} 
-                onUndo={undoTask} 
-                onCopy={copyTask} 
-              />
-            ))
-          ) : (
-            <div className="text-center py-6 text-gray-500 font-mono">
-              No completed quests yet.
-            </div>
-          )}
-        </div>
       )}
     </div>
   );
@@ -704,6 +783,7 @@ function RecurringInstanceItem({ template }: { template: Task }) {
   const [completedTaskId, setCompletedTaskId] = useState<string | null>(null);
   const [hasInstance, setHasInstance] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [isFailed, setIsFailed] = useState(false);
   
   // Generate a stable component-specific key for this template
   const templateKey = useMemo(() => template.id, [template.id]);
@@ -719,125 +799,163 @@ function RecurringInstanceItem({ template }: { template: Task }) {
     hard: 'text-red-500'
   };
   
+  // Format date for display
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'short',
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+  
   // Check if there's already a task for this template today
   useEffect(() => {
     if (isCreatingTask) {
       return; // Skip checks if we're in the process of creating a task
     }
     
-    // Check for ANY task for this template today (completed or not)
-    const todayTask = tasks.find(t => 
-      t.parentTaskId === templateKey && // Match by template ID
-      ((t.createdAt && t.createdAt.startsWith(today)) || 
-       (t.completedAt && t.completedAt.startsWith(today)))
-    );
+    // Get today's date
+    const todayDate = new Date();
+    const todayString = todayDate.toISOString().split('T')[0];
     
-    if (todayTask) {
-      console.log(`Found existing task for template ${templateKey} today: ${todayTask.id} (Completed: ${todayTask.completed})`);
+    console.log(`Checking tasks for template ${template.title} (${templateKey}) on ${todayString}`);
+    
+    // Find all tasks for today that match this template
+    const allTodaysTasks = tasks.filter(t => {
+      // Match tasks created or completed today
+      const createdToday = t.createdAt && t.createdAt.startsWith(todayString);
+      const completedToday = t.completedAt && t.completedAt.startsWith(todayString);
+      const isForToday = createdToday || completedToday;
+      
+      // Match by parent template ID or same title (for direct completion cases)
+      const matchesTemplate = t.parentTaskId === templateKey || 
+                              (t.title === template.title && t.isRecurring === false);
+      
+      return isForToday && matchesTemplate;
+    });
+    
+    console.log(`Found ${allTodaysTasks.length} tasks for template ${template.title} today:`, 
+      allTodaysTasks.map(t => `${t.id} (completed: ${t.completed})`));
+    
+    // Find specifically failed tasks
+    const failedTask = allTodaysTasks.find(t => t.title.startsWith('FAILED:'));
+    
+    // Find specifically completed tasks
+    const completedTask = allTodaysTasks.find(t => t.completed === true);
+    
+    // Regular instance (not completed, not failed)
+    const regularTask = allTodaysTasks.find(t => !t.completed && !t.title.startsWith('FAILED:'));
+    
+    if (failedTask) {
+      console.log(`Found failed task for template ${template.title} today: ${failedTask.id}`);
+      setIsFailed(true);
       setHasInstance(true);
-      setIsCompleted(todayTask.completed);
-      setCompletedTaskId(todayTask.id);
+      setCompletedTaskId(failedTask.id);
+    } else if (completedTask) {
+      console.log(`Found completed task for template ${template.title} today: ${completedTask.id}`);
+      setHasInstance(true);
+      setIsCompleted(true);
+      setIsFailed(false);
+      setCompletedTaskId(completedTask.id);
+    } else if (regularTask) {
+      console.log(`Found existing task for template ${template.title} today: ${regularTask.id}`);
+      setHasInstance(true);
+      setIsCompleted(false);
+      setIsFailed(false);
+      setCompletedTaskId(regularTask.id);
     } else {
+      // No tasks found for today
+      console.log(`No tasks found for template ${template.title} today`);
       setHasInstance(false);
       setIsCompleted(false);
+      setIsFailed(false);
       setCompletedTaskId(null);
     }
-  }, [tasks, templateKey, today, isCreatingTask]);
+  }, [tasks, templateKey, today, isCreatingTask, template.title]);
   
-  // Function to manually create a task instance
-  const handleCreateTask = () => {
-    if (hasInstance) {
-      console.log(`Task already exists for template ${templateKey} today`);
-      return;
-    }
-    
-    setIsCreatingTask(true);
-    
-    try {
-      // Create a new task instance based on the template
-      const newTaskId = uuidv4();
-      console.log(`Creating new task: ${newTaskId} from template ${templateKey}`);
-      
-      const newTask: Task = {
-        id: newTaskId,
-        title: template.title,
-        description: template.description || '',
-        difficulty: template.difficulty,
-        xpReward: template.xpReward,
-        completed: false,
-        createdAt: new Date().toISOString(),
-        completedAt: undefined,
-        isRecurring: false,
-        parentTaskId: templateKey,
-        questType: template.questType
-      };
-      
-      // Add the task to the task list
-      const updatedTasks = [...tasks, newTask];
-      saveTasks(updatedTasks);
-      
-      // Update the UI
-      setHasInstance(true);
-      setCompletedTaskId(newTaskId);
-      
-      console.log(`Created new task: ${newTaskId}`);
-    } catch (error) {
-      console.error('Error creating task:', error);
-    } finally {
-      setIsCreatingTask(false);
-    }
-  };
+ 
   
   // Function to create and immediately complete a task
   const handleCreateAndComplete = () => {
-    if (hasInstance && isCompleted) {
-      console.log(`Task already exists and is completed for template ${templateKey}`);
+    if (isCompleted) {
+      console.log(`Task is already completed, skipping`);
       return;
     }
     
-    setIsCreatingTask(true);
-    
     try {
-      // If a task already exists but isn't completed, complete it
-      if (hasInstance && completedTaskId) {
-        console.log(`Completing existing task: ${completedTaskId}`);
-        completeTask(completedTaskId);
-        setIsCompleted(true);
-        setIsCreatingTask(false);
-        return;
-      }
+      setIsCreatingTask(true);
+      console.log(`Creating and completing task "${template.title}" from template ${template.id}`);
       
-      // Otherwise create a new task
-      const newTaskId = uuidv4();
-      console.log(`Creating and completing new task: ${newTaskId}`);
+      // For creation time, use 12:01 AM of the current day (for better time tracking)
+      const creationISOString = getDayStartDateString();
       
+      // For completion time, use the exact current time
+      const completionISOString = getLocalISOString();
+      
+      // Create new task based on the template
       const newTask: Task = {
-        id: newTaskId,
+        id: uuidv4(),
         title: template.title,
-        description: template.description || '',
+        description: template.description,
         difficulty: template.difficulty,
+        completed: false, // Will be marked as completed after creation
+        createdAt: creationISOString, // Using 12:01 AM for recurring tasks
         xpReward: template.xpReward,
-        completed: false,
-        createdAt: new Date().toISOString(),
-        completedAt: undefined,
-        isRecurring: false,
-        parentTaskId: templateKey,
-        questType: template.questType
+        isRecurring: false, // Instance is not itself recurring
+        parentTaskId: template.id, // Keep reference to parent template
+        questType: template.questType,
+        questStatus: 'active'
       };
       
-      // Add the task to the task list
-      const tasksWithNewTask = [...tasks, newTask];
-      saveTasks(tasksWithNewTask);
+      // Add new task to tasks list but don't save yet
+      const updatedTasks = [...tasks, newTask];
+      saveTasks(updatedTasks);
       
-      // Update UI state
-      setHasInstance(true);
-      setCompletedTaskId(newTaskId);
+      // Store the new task ID (need to wait for state to update)
+      const newTaskId = newTask.id;
+      
+      console.log(`Created task with ID: ${newTaskId}, now completing with creation time ${creationISOString} and completion time will be set to current time`);
       
       // Wait for the task to be saved then complete it
       setTimeout(() => {
         completeTask(newTaskId);
+        
+        // Also verify the task has been updated with completedAt timestamp
+        setTimeout(() => {
+          // Get latest tasks and check if our task has completedAt set
+          const currentTasks = getTasks();
+          const completedTask = currentTasks.find((t: Task) => t.id === newTaskId);
+          
+          if (completedTask && !completedTask.completedAt) {
+            console.error(`Task ${newTaskId} was completed but has no completedAt timestamp!`, completedTask);
+            
+            // Fix the task manually if needed
+            const fixedTask: Task = {
+              ...completedTask,
+              completedAt: getLocalISOString(),
+              questStatus: 'completed' as const // Explicitly type as QuestStatus
+            };
+            
+            // Update the task in storage
+            const updatedTasks = currentTasks.map((t: Task) => t.id === newTaskId ? fixedTask : t);
+            saveTasksUtil(updatedTasks);
+            console.log(`Fixed missing completedAt timestamp for task ${newTaskId}`);
+          } else {
+            console.log(`Task ${newTaskId} completion verified:`, completedTask);
+          }
+        }, 200);
+        
+        // Update UI state immediately to reflect completion
         setIsCompleted(true);
         setIsCreatingTask(false);
+        setHasInstance(true);
+        setCompletedTaskId(newTaskId);
+        
+        // Log the completion for debugging
+        console.log(`Completed task ${newTaskId}, set isCompleted to true.`);
       }, 100);
     } catch (error) {
       console.error('Error creating and completing task:', error);
@@ -845,70 +963,31 @@ function RecurringInstanceItem({ template }: { template: Task }) {
     }
   };
   
-  // Get visual state based on instance status
+  // Get the status info
   const getStatusInfo = () => {
-    // Check if there's a failed task for this template today
-    const failedTask = tasks.find(t => 
-      t.parentTaskId === template.id && 
-      t.title.startsWith('FAILED:') &&
-      t.completedAt?.startsWith(today)
-    );
+    // Check if we have a task instance with the correct ID
+    const taskInstance = tasks.find(t => t.id === completedTaskId);
     
-    if (failedTask) {
+    if (isFailed) {
       return {
-        borderClass: "border-amber-900/40 bg-gray-900/70",
-        statusText: "Failed",
-        statusClass: "text-amber-500",
-        isFailed: true
+        text: 'Failed',
+        classes: 'bg-amber-900/50 text-amber-300 border-amber-600'
       };
-    }
-    
-    // Category-based border colors
-    const categoryBorders: Record<string, string> = {
-      health: "border-green-600",
-      productivity: "border-yellow-600",
-      personal: "border-purple-600",
-      home: "border-orange-600",
-      tech: "border-indigo-600",
-      social: "border-pink-600"
-    };
-    
-    // If template has a category, use that for the border
-    if (template.questType && template.questType !== "No Type") {
-      const category = template.questType.toLowerCase();
-      const borderClass = categoryBorders[category];
-      
-      if (borderClass) {
-        return {
-          borderClass: `${borderClass} bg-gray-900/90`,
-          statusText: hasInstance ? (isCompleted ? "Completed" : "Active") : "Available",
-          statusClass: hasInstance ? (isCompleted ? "text-green-500" : "text-purple-400") : "text-blue-400",
-          isFailed: false
-        };
-      }
-    }
-    
-    // Default status based on instance state
-    if (!hasInstance) {
+    } else if (isCompleted || (taskInstance && taskInstance.completed)) {
       return {
-        borderClass: "border-blue-700 bg-gray-900/90",
-        statusText: "Available",
-        statusClass: "text-blue-400",
-        isFailed: false
+        text: 'Completed',
+        classes: 'bg-green-900/50 text-green-300 border-green-600'
       };
-    } else if (isCompleted) {
+    } else if (taskInstance && taskInstance.questStatus === 'hidden') {
       return {
-        borderClass: "border-gray-600 bg-gray-900/70",
-        statusText: "Completed",
-        statusClass: "text-green-500",
-        isFailed: false
+        text: 'Hidden',
+        classes: 'bg-gray-900/50 text-gray-300 border-gray-600'
       };
     } else {
+      // Default to Active for non-completed, non-failed, non-hidden tasks
       return {
-        borderClass: "border-purple-600 bg-gray-900/90",
-        statusText: "Active",
-        statusClass: "text-purple-400",
-        isFailed: false
+        text: 'Active',
+        classes: 'bg-blue-900/50 text-blue-300 border-blue-600'
       };
     }
   };
@@ -924,7 +1003,7 @@ function RecurringInstanceItem({ template }: { template: Task }) {
     failRecurringTask(template);
     
     // Update UI state to reflect the task was marked as failed
-    setIsCompleted(true);
+    setIsFailed(true);
     setHasInstance(true);
     setCompletedTaskId(template.id); // Set the completed task ID to help with status checks
   };
@@ -952,24 +1031,29 @@ function RecurringInstanceItem({ template }: { template: Task }) {
     return questTypeColors[category] || 'bg-gray-700/50 text-gray-300';
   };
   
+  // Calculate display date - today's date for new, or from the task if it exists
+  const displayDate = isCompleted || isFailed 
+    ? formatDate(tasks.find(t => t.id === completedTaskId)?.completedAt) 
+    : formatDate(new Date().toISOString()); // Use current date in ISO format instead of 'today' string
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className={`p-4 mb-3 rounded-md border ${statusInfo.borderClass}`}
+      className={`p-4 mb-3 rounded-md border ${statusInfo.classes}`}
     >
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <div className="flex items-center">
             <h3 className="text-lg font-mono flex items-center">
-              <span className={`${difficultyColors[template.difficulty]}`}>{template.title}</span>
+              <span className={`${difficultyColors[template.difficulty]}`}>{template.title.replace('FAILED: ', '')}</span>
               <span className="ml-2 text-xs text-gray-400">
                 <ArrowPathIcon className="w-3 h-3 inline-block mr-1" />
                 {formattedDayOfWeek}
               </span>
-              <span className={`ml-2 text-xs font-bold ${statusInfo.statusClass} border border-current px-2 py-0.5 rounded`}>
-                {statusInfo.statusText}
+              <span className={`ml-2 text-xs font-bold ${statusInfo.classes.split(' ')[1]} border border-current px-2 py-0.5 rounded`}>
+                {statusInfo.text}
               </span>
             </h3>
           </div>
@@ -983,6 +1067,10 @@ function RecurringInstanceItem({ template }: { template: Task }) {
               {template.difficulty.toUpperCase()}
             </span>
             <span className="ml-2 text-purple-400">+{template.xpReward} XP</span>
+            <span className="ml-2 text-gray-400 flex items-center">
+              <CalendarIcon className="w-3 h-3 mr-1" />
+              {displayDate}
+            </span>
             {/* Display quest type if available */}
             {template.questType && template.questType !== "No Type" && (
               <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${getCategoryClass()}`}>
@@ -991,66 +1079,31 @@ function RecurringInstanceItem({ template }: { template: Task }) {
             )}
           </div>
         </div>
-        
-        <div className="flex space-x-2">
-          {/* Don't show any buttons if the task is failed */}
-          {!statusInfo.isFailed && (
-            <>
-              {!hasInstance && (
-                <>
-                  <button
-                    onClick={handleCreateTask}
-                    className="p-2 rounded-full hover:bg-gray-700 transition-colors"
-                    aria-label="Create task"
-                    title="Create task for today"
-                  >
-                    <PlusIcon className="w-5 h-5 text-blue-400" />
-                  </button>
-                  
-                  <button
-                    onClick={handleCreateAndComplete}
-                    className="p-2 rounded-full hover:bg-gray-700 transition-colors"
-                    aria-label="Create and complete task"
-                    title="Create and mark as completed"
-                  >
-                    <CheckCircleIcon className="w-5 h-5 text-green-400" />
-                  </button>
-                  
-                  <button
-                    onClick={handleMarkAsFailed}
-                    className="p-2 rounded-full hover:bg-gray-700 transition-colors"
-                    aria-label="Mark as failed"
-                    title="Mark as failed (lose XP)"
-                  >
-                    <ExclamationCircleIcon className="w-5 h-5 text-amber-400" />
-                  </button>
-                </>
-              )}
-              
-              {hasInstance && !isCompleted && (
-                <>
-                  <button
-                    onClick={handleCreateAndComplete}
-                    className="p-2 rounded-full hover:bg-gray-700 transition-colors"
-                    aria-label="Complete task"
-                    title="Mark as completed"
-                  >
-                    <CheckCircleIcon className="w-5 h-5 text-green-400" />
-                  </button>
-                  
-                  <button
-                    onClick={handleMarkAsFailed}
-                    className="p-2 rounded-full hover:bg-gray-700 transition-colors"
-                    aria-label="Mark as failed"
-                    title="Mark as failed (lose XP)"
-                  >
-                    <ExclamationCircleIcon className="w-5 h-5 text-amber-400" />
-                  </button>
-                </>
-              )}
-            </>
-          )}
-        </div>
+
+        {/* Don't show any buttons if the task is failed or completed */}
+        {!isFailed && !isCompleted && (
+          <div className="flex space-x-2">
+            <button
+              onClick={handleCreateAndComplete}
+              className="p-2 rounded-full hover:bg-gray-700 transition-colors"
+              aria-label="Complete task"
+              title="Mark as completed"
+              disabled={isCreatingTask}
+            >
+              <CheckCircleIcon className="w-5 h-5 text-green-400" />
+            </button>
+            
+            <button
+              onClick={handleMarkAsFailed}
+              className="p-2 rounded-full hover:bg-gray-700 transition-colors"
+              aria-label="Mark as failed"
+              title="Mark as failed (lose XP)"
+              disabled={isCreatingTask}
+            >
+              <ExclamationCircleIcon className="w-5 h-5 text-amber-400" />
+            </button>
+          </div>
+        )}
       </div>
     </motion.div>
   );

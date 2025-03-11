@@ -15,13 +15,17 @@ import FailedQuests from './components/FailedTasks';
 import QuestSuggestionModal from './components/QuestSuggestionModal';
 import ResetDataButton from './components/ResetDataButton';
 import SaveLoadButtons from './components/SaveLoadButtons';
-import { PlusIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import CompletedQuestList from './components/CompletedQuestList';
+import { PlusIcon, SparklesIcon, EyeIcon, EyeSlashIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { useQuest } from './context/QuestContext';
 
 
 export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
+  const [showHiddenTasks, setShowHiddenTasks] = useState(false);
+  const [showRecurringTemplates, setShowRecurringTemplates] = useState(false);
   
   const handleEditTask = (task: Task) => {
     setEditingTask(task);
@@ -69,34 +73,72 @@ export default function Home() {
         </div>
         {/* Active quests section */}
         <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
             <h2 className="text-xl font-mono border-b border-gray-700 pb-2">Active Quests</h2>
-            {!showForm && (
-              <div className="flex space-x-2">
-                <SaveLoadButtons />
-                <button
-                  onClick={() => setShowSuggestionModal(true)}
-                  className="flex items-center px-4 py-2 bg-blue-700 rounded-md font-mono hover:bg-blue-600 transition-colors"
-                >
-                  <SparklesIcon className="w-5 h-5 mr-1" />
-                  Generate Quest
-                </button>
-                <button
-                  onClick={() => setShowForm(true)}
-                  className="flex items-center px-4 py-2 bg-purple-700 rounded-md font-mono hover:bg-purple-600 transition-colors"
-                >
-                  <PlusIcon className="w-5 h-5 mr-1" />
-                  Create Quest
-                </button>
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {!showForm && (
+                <>
+                  {/* Global action buttons - standardized heights and widths */}
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <SaveLoadButtons />
+                    
+                    <button
+                      onClick={() => setShowHiddenTasks(!showHiddenTasks)}
+                      className="flex items-center justify-center h-8 w-24 text-xs px-2 py-1 bg-gray-700 rounded font-mono hover:bg-gray-600 transition-colors"
+                    >
+                      {showHiddenTasks ? (
+                        <>
+                          <EyeIcon className="w-4 h-4 mr-1 flex-shrink-0" />
+                          <span>Hide Hidden</span>
+                        </>
+                      ) : (
+                        <>
+                          <EyeSlashIcon className="w-4 h-4 mr-1 flex-shrink-0" />
+                          <span>Show Hidden</span>
+                        </>
+                      )}
+                    </button>
+                    
+                    {/* Manage Templates button - fixed width */}
+                    <button
+                      onClick={() => setShowRecurringTemplates(!showRecurringTemplates)}
+                      className="flex items-center justify-center h-8 w-32 text-xs px-2 py-1 bg-gray-700 rounded font-mono hover:bg-gray-600 transition-colors"
+                    >
+                      <CalendarIcon className="w-4 h-4 mr-1 flex-shrink-0" />
+                      <span>{showRecurringTemplates ? 'Hide Templates' : 'Show Templates'}</span>
+                    </button>
+                    
+                    {/* Action buttons - consistent height with toggle buttons */}
+                    <button
+                      onClick={() => setShowSuggestionModal(true)}
+                      className="flex items-center justify-center h-8 text-xs px-4 py-1 bg-blue-700 rounded font-mono hover:bg-blue-600 transition-colors"
+                    >
+                      <SparklesIcon className="w-4 h-4 mr-1 flex-shrink-0" />
+                      <span>Generate Quest</span>
+                    </button>
+                    <button
+                      onClick={() => setShowForm(true)}
+                      className="flex items-center justify-center h-8 text-xs px-4 py-1 bg-purple-700 rounded font-mono hover:bg-purple-600 transition-colors"
+                    >
+                      <PlusIcon className="w-4 h-4 mr-1 flex-shrink-0" />
+                      <span>Create Quest</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
           
           {showForm && (
             <TaskForm editingTask={editingTask} onCancel={handleCancelForm} />
           )}
           
-          <TaskList onEditTask={handleEditTask} showCompleted={false} />
+          <TaskList 
+            onEditTask={handleEditTask} 
+            showCompleted={false} 
+            showHidden={showHiddenTasks}
+            showRecurringTemplates={showRecurringTemplates}
+          />
         </div>
         
         {/* Visualizations section */}
@@ -116,7 +158,10 @@ export default function Home() {
         {/* Completed quests section */}
         <div id="completed-quests-section" className="mb-8">
           <h2 className="text-xl font-mono mb-4 border-b border-gray-700 pb-2">Completed Quests</h2>
-          <TaskList onEditTask={handleEditTask} showActive={false} showCompleted={true} />
+          <CompletedQuestList 
+            onEditTask={handleEditTask} 
+            showHidden={showHiddenTasks} 
+          />
         </div>
         
         {/* Failed quests section */}

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Task, User, TaskDifficulty, DayOfWeek } from '../types';
+import { Task, User, TaskDifficulty, DayOfWeek, QuestStatus } from '../types';
 import { 
   getTasks, saveTasks, 
   getUser, saveUser, 
@@ -36,6 +36,8 @@ interface QuestContextType {
   deleteTask: (id: string) => void;
   editTask: (id: string, title: string, description: string, difficulty: TaskDifficulty, isRecurring?: boolean, recurringDays?: DayOfWeek[], questType?: string) => void;
   copyTask: (id: string) => void;
+  hideTask: (id: string) => void;
+  unhideTask: (id: string) => void;
   isLevelUp: boolean;
   dismissLevelUp: () => void;
   saveTasks: (tasks: Task[]) => void;
@@ -433,12 +435,12 @@ export function QuestProvider({ children }: { children: ReactNode }) {
   }, [questTypes]);
   
 
-  const addTask = useCallback((
+  const addTask = (
     title: string, 
     description: string, 
-    difficulty: TaskDifficulty, 
-    isRecurring: boolean = false, 
-    recurringDays: DayOfWeek[] = [],
+    difficulty: TaskDifficulty,
+    isRecurring?: boolean,
+    recurringDays?: DayOfWeek[],
     questType?: string
   ) => {
     const xpReward = XP_REWARDS[difficulty];
@@ -456,14 +458,15 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       xpReward,
       isRecurring,
       recurringDays: isRecurring ? recurringDays : undefined,
-      questType: uppercaseQuestType
+      questType: uppercaseQuestType,
+      questStatus: 'active' // Set active as default status
     };
     
     const updatedTasks = [...tasks, newTask];
     setTasks(updatedTasks);
     saveTasks(updatedTasks);
     updateTaskHistory(newTask);
-  }, [tasks, user, setUser]);
+  };
 
   const completeTask = (id: string) => {
     console.log(`CompleteTask called for task ID: ${id}`);
@@ -497,22 +500,34 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     
     console.log(`Completing task ${id}: ${task.title}`);
     
-    // Get current date and time in local timezone with consistent offset
+    // Get current date and time in local timezone with consistent format
     const now = new Date();
-    const localDate = getLocalDateString();
-    const localTimeOffset = now.getTimezoneOffset() * 60000;
-    const localISOString = new Date(now.getTime() - localTimeOffset).toISOString();
     
-    // Mark task as completed
+    // Format: Use precise ISO string for completion time (will be used for productivity analysis)
+    const completionISOString = now.toISOString();
+    
+    console.log(`Setting completion time to: ${completionISOString}`);
+    
+    // Mark task as completed and update status
     const updatedTask = {
       ...task,
       completed: true,
-      completedAt: localISOString
+      completedAt: completionISOString,
+      questStatus: 'completed' as const // Explicitly type as QuestStatus
     };
+    
+    // Log the updated task for verification
+    console.log('Updated task:', JSON.stringify(updatedTask, null, 2));
     
     // Create a new array with the updated task
     const updatedTasks = [...currentTasks];
     updatedTasks[taskIndex] = updatedTask;
+    
+    // Save tasks to ensure completedAt is properly stored
+    saveTasks(updatedTasks);
+    
+    // Update task history to include completion time
+    updateTaskHistory(updatedTask);
     
     // Calculate XP from completed tasks
     const completedTasks = updatedTasks.filter(task => task.completed);
@@ -556,7 +571,7 @@ export function QuestProvider({ children }: { children: ReactNode }) {
       level: newLevelValue,
       xpToNextLevel: xpToNextLevel,
       tasksCompleted: user.tasksCompleted + 1,
-      lastActive: localDate
+      lastActive: getLocalDateString() // Use just the date part without time for consistent comparison
     };
     
     // Save to localStorage first to ensure persistence
@@ -685,79 +700,39 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     saveTasks(updatedTasks);
   };
 
-  const editTask = useCallback((
+  const editTask = (
     id: string, 
     title: string, 
     description: string, 
-    difficulty: TaskDifficulty, 
-    isRecurring: boolean = false, 
-    recurringDays: DayOfWeek[] = [],
+    difficulty: TaskDifficulty,
+    isRecurring?: boolean,
+    recurringDays?: DayOfWeek[],
     questType?: string
   ) => {
-    const taskIndex = tasks.findIndex(task => task.id === id);
-    
-    if (taskIndex === -1) return;
-    
-    const oldTask = tasks[taskIndex];
-    const wasCompleted = oldTask.completed;
-    
-    // Calculate new XP reward
-    const newXpReward = XP_REWARDS[difficulty];
-    
-    // Convert questType to uppercase if it exists
-    const uppercaseQuestType = questType ? questType.toUpperCase() : undefined;
-    
-    // Create updated task
-    const updatedTask = {
-      ...oldTask,
-      title,
-      description: description || undefined,
-      difficulty,
-      xpReward: newXpReward,
-      isRecurring,
-      recurringDays: isRecurring ? recurringDays : undefined,
-      questType: uppercaseQuestType
-    };
+    const editedAt = new Date().toISOString();
     
     const updatedTasks = tasks.map(task => {
       if (task.id === id) {
-        return updatedTask;
+        // Preserve the questStatus when editing
+        const questStatus = task.questStatus || 'active';
+        return {
+          ...task,
+          title,
+          description,
+          difficulty,
+          xpReward: XP_REWARDS[difficulty],
+          isRecurring,
+          recurringDays,
+          questType,
+          questStatus
+        };
       }
       return task;
     });
     
-    // If the task was completed, update the user's XP
-    if (wasCompleted) {
-      // Calculate new total XP
-      const completedTasks = updatedTasks.filter(task => task.completed);
-      const calculatedTotalXp = completedTasks.reduce((total, task) => total + task.xpReward, 0);
-      
-      // Calculate new level
-      const oldLevel = calculateLevel(user.totalXp);
-      const newLevel = calculateLevel(calculatedTotalXp);
-      
-      // Update user stats
-      const updatedUser = {
-        ...user,
-        totalXp: calculatedTotalXp,
-        level: newLevel,
-        tasksCompleted: completedTasks.length
-      };
-      
-      // Check for level up
-      if (newLevel > oldLevel) {
-        setIsLevelUp(true);
-      }
-      
-      // Update state
-      setUser(updatedUser);
-      saveUser(updatedUser);
-    }
-    
-    // Update tasks
     setTasks(updatedTasks);
     saveTasks(updatedTasks);
-  }, [tasks]);
+  };
 
   const copyTask = (id: string) => {
     const taskIndex = tasks.findIndex(task => task.id === id);
@@ -882,6 +857,17 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayString = yesterday.toISOString().split('T')[0];
     
+    // Get today's date string
+    const todayString = getLocalDateString().split('T')[0];
+    console.log(`Today's date for failed task check: ${todayString}`);
+    
+    // Skip the check if we already did it today (add a check in localStorage)
+    const lastFailedCheck = localStorage.getItem('dailyquest_last_failed_check');
+    if (lastFailedCheck === todayString) {
+      console.log(`Already checked for failed tasks today (${todayString}), skipping...`);
+      return;
+    }
+    
     // Get day of week for yesterday
     const yesterdayDayOfWeek = getDayOfWeek(yesterday);
     
@@ -896,12 +882,14 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     
     if (yesterdayTemplates.length === 0) {
       console.log('No recurring tasks scheduled for yesterday');
+      // Mark that we've checked today
+      localStorage.setItem('dailyquest_last_failed_check', todayString);
       return;
     }
     
     console.log(`Found ${yesterdayTemplates.length} recurring templates for yesterday (${yesterdayDayOfWeek})`);
     
-    // Find all instances created yesterday
+    // Find all instances created yesterday (only check instances with a timestamp from yesterday)
     const yesterdayInstances = tasks.filter(task => 
       task.parentTaskId && 
       (task.createdAt?.startsWith(yesterdayString) || task.completedAt?.startsWith(yesterdayString))
@@ -914,18 +902,56 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     
     // Check each template to see if it was completed
     yesterdayTemplates.forEach(template => {
-      // Find an instance of this template from yesterday
-      const instance = yesterdayInstances.find(t => t.parentTaskId === template.id);
+      // Find all instances of this template from yesterday specifically
+      const templateInstances = yesterdayInstances.filter(t => t.parentTaskId === template.id);
+      console.log(`Template "${template.title}" has ${templateInstances.length} instances from yesterday`);
       
-      // If no instance exists or it wasn't completed, mark as failed
-      if (!instance) {
+      // Find if there's an instance completed today (to prevent marking as failed tasks that were just completed)
+      const todayInstance = tasks.find(t => 
+        t.parentTaskId === template.id && 
+        t.completed && 
+        t.completedAt?.startsWith(todayString)
+      );
+      
+      // Find if there's already a failed instance for this template within the past 48 hours
+      const recentFailedInstance = tasks.find(t => 
+        t.parentTaskId === template.id && 
+        t.title.startsWith('FAILED:') &&
+        (t.completedAt?.startsWith(yesterdayString) || t.completedAt?.startsWith(todayString))
+      );
+      
+      // If we already have a failed instance for this template, skip it
+      if (recentFailedInstance) {
+        console.log(`Template "${template.title}" already has a failed instance - skipping`);
+        return;
+      }
+      
+      // If we have a completed instance from today, skip this template
+      if (todayInstance) {
+        console.log(`Template "${template.title}" has a completed instance today - skipping failure check`);
+        return; // Skip this template
+      }
+      
+      // Skip if we have a completed instance from yesterday
+      const completedYesterdayInstance = templateInstances.find(t => t.completed === true);
+      if (completedYesterdayInstance) {
+        console.log(`Template "${template.title}" has a completed instance from yesterday - skipping failure check`);
+        return;
+      }
+      
+      // If we reach here and no instances exist for yesterday, mark as failed
+      if (templateInstances.length === 0) {
         console.log(`Template "${template.title}" had no instance created yesterday - marking as failed`);
         failedTasks.push(template);
-      } else if (!instance.completed) {
-        console.log(`Template "${template.title}" had an incomplete instance yesterday - marking as failed`);
-        failedTasks.push(template);
       } else {
-        console.log(`Template "${template.title}" was completed yesterday`);
+        // If we have instances but none were completed, mark as failed
+        const hasCompletedInstance = templateInstances.some(t => t.completed);
+        if (!hasCompletedInstance) {
+          console.log(`Template "${template.title}" had incomplete instances yesterday - marking as failed`);
+          failedTasks.push(template);
+        } else {
+          console.log(`Template "${template.title}" was completed yesterday`);
+        }
       }
     });
     
@@ -949,6 +975,9 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     } else {
       console.log('No failed tasks from yesterday!');
     }
+    
+    // Mark that we've checked today to prevent multiple checks in the same day
+    localStorage.setItem('dailyquest_last_failed_check', todayString);
   }, [tasks, failRecurringTask]);
 
   // Check for day change and update streak
@@ -957,19 +986,24 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     
     const today = getLocalDateString();
     
-    // If last active date is not today, there was a day change
-    if (user.lastActive !== today) {
-      console.log(`Day change detected: ${user.lastActive} → ${today}`);
+    // Get the date parts only for comparison
+    const lastActiveDate = user.lastActive.split('T')[0];
+    const todayDate = today.split('T')[0];
+    
+    // Only run day change logic if the dates are different (not just the timestamps)
+    // This prevents triggering when simply completing tasks within the same day
+    if (lastActiveDate !== todayDate) {
+      console.log(`Day change detected: ${lastActiveDate} → ${todayDate}`);
       
       // Check for missed/failed tasks from yesterday
       checkForFailedTasks();
       
       // Calculate new streak based on consecutive days
-      const lastActiveDate = new Date(user.lastActive);
-      const todayDate = new Date(today);
+      const lastActiveDateObj = new Date(lastActiveDate);
+      const todayDateObj = new Date(todayDate);
       
       // Calculate the difference in days
-      const timeDiff = todayDate.getTime() - lastActiveDate.getTime();
+      const timeDiff = todayDateObj.getTime() - lastActiveDateObj.getTime();
       const dayDiff = Math.floor(timeDiff / (1000 * 3600 * 24)); // Convert ms to days
       
       // Update streak based on day difference
@@ -1016,6 +1050,75 @@ export function QuestProvider({ children }: { children: ReactNode }) {
     }
   }, [user.lastActive, user.streakDays, checkForFailedTasks]);
 
+  // Add new functions to handle hiding/unhiding tasks
+  const hideTask = (id: string) => {
+    setTasks(prevTasks => {
+      const updatedTasks = prevTasks.map(task => {
+        if (task.id === id) {
+          return { ...task, questStatus: 'hidden' as QuestStatus };
+        }
+        return task;
+      });
+      saveTasks(updatedTasks);
+      return updatedTasks;
+    });
+  };
+
+  const unhideTask = (id: string) => {
+    setTasks(prevTasks => {
+      const updatedTasks = prevTasks.map(task => {
+        if (task.id === id) {
+          return { ...task, questStatus: 'active' as QuestStatus };
+        }
+        return task;
+      });
+      saveTasks(updatedTasks);
+      return updatedTasks;
+    });
+  };
+
+  // Function to verify all completed tasks have completedAt timestamps
+  const verifyCompletedTasks = useCallback(() => {
+    console.log('Verifying completed tasks have timestamps...');
+    
+    // Get all tasks
+    const allTasks = getTasks();
+    const completedTasks = allTasks.filter(task => task.completed);
+    const tasksWithoutTimestamp = completedTasks.filter(task => !task.completedAt);
+    
+    if (tasksWithoutTimestamp.length > 0) {
+      console.warn(`Found ${tasksWithoutTimestamp.length} completed tasks without completion timestamps!`);
+      
+      // Fix the tasks
+      const now = new Date();
+      const fixedTasks = allTasks.map(task => {
+        if (task.completed && !task.completedAt) {
+          console.log(`Fixing missing completedAt for task: ${task.title} (${task.id})`);
+          return {
+            ...task,
+            completedAt: now.toISOString(), // Use current time as fallback
+            questStatus: 'completed' as const // Make sure status is updated too
+          };
+        }
+        return task;
+      });
+      
+      // Save the fixed tasks
+      saveTasks(fixedTasks);
+      console.log('Fixed timestamp issues in completed tasks');
+      
+      // Update the local tasks state
+      setTasks(fixedTasks);
+    } else {
+      console.log('All completed tasks have proper timestamps');
+    }
+  }, []);
+  
+  // Run verification when app initializes or when task count changes
+  useEffect(() => {
+    verifyCompletedTasks();
+  }, [verifyCompletedTasks, tasks.length]);
+
   return (
     <QuestContext.Provider
       value={{
@@ -1028,6 +1131,8 @@ export function QuestProvider({ children }: { children: ReactNode }) {
         deleteTask,
         editTask,
         copyTask,
+        hideTask,
+        unhideTask,
         isLevelUp,
         dismissLevelUp,
         saveTasks,

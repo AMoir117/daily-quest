@@ -12,7 +12,6 @@ import {
   Legend,
   Filler,
   ChartOptions,
-  ChartData
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { getStats, getLocalDateString } from '../utils/storageUtils';
@@ -64,13 +63,13 @@ export default function QuestsChart() {
     setIsDataReady(true);
   }, [user.tasksCompleted]); // Re-fetch stats when tasksCompleted changes
   
-  // Format date for display (e.g., "Mar 15")
+  // Format date for display (e.g., "Mon, Mar 15")
   const formatDate = (dateString: string) => {
     // Handle date strings in YYYY-MM-DD format to prevent timezone issues
     // By appending 'T12:00:00' we set it to noon to avoid any date shifting
     const fullDateString = `${dateString}T12:00:00`;
     const date = new Date(fullDateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
   
   // Prepare data for charts
@@ -208,7 +207,10 @@ export default function QuestsChart() {
     }
   };
   
-  if (stats.length === 0) {
+  // Check if there are any completed tasks
+  const hasCompletedTasks = stats.some(stat => stat.tasksCompleted > 0);
+  
+  if (!hasCompletedTasks) {
     return (
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 h-40 flex items-center justify-center">
         <p className="text-gray-400 font-mono">Complete quests to see your progress over time!</p>

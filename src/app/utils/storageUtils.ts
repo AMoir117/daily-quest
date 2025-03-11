@@ -14,6 +14,20 @@ export function getLocalDateString(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
+// Helper function to get a standardized timestamp in ISO format with local time consideration
+export function getLocalISOString(): string {
+  const now = new Date();
+  return now.toISOString();
+}
+
+// Helper function to create a date set to 12:01 AM of the current day (for recurring tasks)
+export function getDayStartDateString(): string {
+  const now = new Date();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 1, 0, 0); // 12:01:00.000 AM
+  return dayStart.toISOString();
+}
+
 // Default user data
 export const DEFAULT_USER: User = {
   level: 1,
